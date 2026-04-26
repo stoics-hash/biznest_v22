@@ -39,7 +39,9 @@ ENV/
 
 # Hazard data - seed it on your owwn using the convert_hazard_data.py and seed_note_data.py scripts
 hazard_data/
-geo_hazard/
+geo_hazard/landslide
+geo_hazard/storm_surge
+geo_hazard/flood
 
 
 # IDEs
