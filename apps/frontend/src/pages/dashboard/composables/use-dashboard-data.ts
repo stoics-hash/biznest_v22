@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getMySubscriptionSubscriptionsMeGet } from '@networking/api/generated/subscriptions/subscriptions'
-import { listHazardAreasCitiesCityIdHazardsGet } from '@networking/api/generated/hazards/hazards'
+import { listHazardAreasProvincesProvinceIdHazardsGet } from '@networking/api/generated/hazards/hazards'
 import { listZoningAreasCitiesCityIdZoningGet } from '@networking/api/generated/zoning/zoning'
 import { listEstablishmentsCitiesCityIdEstablishmentsGet } from '@networking/api/generated/establishments/establishments'
 import { useAuthContext } from '@/context/auth.context'
@@ -10,12 +10,13 @@ export function useDashboardData() {
   const { state } = useAuthContext()
   const { selectedCity } = useCityContext()
   const auth = state.state === 'AUTHENTICATED' ? state : null
-  const cityId = selectedCity?.id ?? null
+  const cityId     = selectedCity?.id ?? null
+  const provinceId = selectedCity?.province_id ?? null
 
   const { data: hazards = [], isLoading: hazardsLoading } = useQuery({
-    queryKey: [`/cities/${cityId}/hazards`],
-    queryFn: () => listHazardAreasCitiesCityIdHazardsGet(cityId!).then(r => r.data),
-    enabled: !!cityId,
+    queryKey: [`/provinces/${provinceId}/hazards`],
+    queryFn: () => listHazardAreasProvincesProvinceIdHazardsGet(provinceId!).then(r => r.data),
+    enabled: !!provinceId,
   })
 
   const { data: zoning = [], isLoading: zoningLoading } = useQuery({
