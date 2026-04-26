@@ -10,6 +10,30 @@ class RegisterRequest(BaseModel):
     password: constr(min_length=6)
 
 
+class LguInviteRequest(BaseModel):
+    email: EmailStr
+    city_id: UUID
+
+
+class LguInviteResponse(BaseModel):
+    message: str
+    magic_link: str
+    city_id: UUID
+    expires_at: datetime
+
+
+class LguRegisterRequest(BaseModel):
+    token: str
+    email: EmailStr
+    username: constr(min_length=3, max_length=50)
+    password: constr(min_length=6)
+
+
+class TokenVerifyResponse(BaseModel):
+    valid: bool
+    email: str
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str

@@ -147,7 +147,7 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
 }
 
 const FULLSCREEN_PATHS = ['/city-setup']
-const MAP_PATHS = ['/map']
+const MAP_PATHS = ['/map', '/zoning']
 
 export function AppShell() {
   const { state, signOut } = useAuthContext()

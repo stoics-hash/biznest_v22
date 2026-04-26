@@ -1,5 +1,6 @@
 from models.user import User
 from models.document import Document
+from models.lgu_invitation import LguInvitation
 from models.region import Region
 from models.province import Province
 from models.city import City
@@ -22,6 +23,7 @@ from models.audit_log import AuditLog
 __all__ = [
     "User",
     "Document",
+    "LguInvitation",
     "Region",
     "Province",
     "City",

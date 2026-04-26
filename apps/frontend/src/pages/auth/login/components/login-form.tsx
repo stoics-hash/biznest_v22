@@ -46,7 +46,7 @@ export function LoginForm({
           <Input
             id="username"
             type="text"
-            placeholder="your_username"
+            placeholder="username"
             autoComplete="username"
             required
             value={username}
