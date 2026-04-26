@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgis/postgis:latest
+    container_name: biznest_potgres
+    environment:
+      POSTGRES_USER: fastapi
+      POSTGRES_PASSWORD: fastapi
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - biznest_db:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - biznest_net
+  minio:
+    image: minio/minio:latest
+    container_name: biznest_minio
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9090"
+    networks:
+      - biznest_net
+    volumes:
+      - biznest_data:/data
+volumes:
+  biznest_db:
+    name: biznest_db
+  biznest_data:
+    name: biznest_data
+
+networks:
+  biznest_net:
+    driver: bridge
+    name: biznest_net
