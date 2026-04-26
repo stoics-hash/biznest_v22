@@ -1,7 +1,7 @@
 fastapi[standard]
 uvicorn[standard]
 sqlalchemy>=2.0.36
-psycopg2-binary
+pg8000
 geoalchemy2
 shapely
 requests

@@ -8,7 +8,10 @@ import {
 import { getUserRolesUserRolesUserIdGet, assignRoleUserRolesPost } from '@networking/api/generated/user-roles/user-roles'
 import { listRolesRolesGet } from '@networking/api/generated/roles/roles'
 import { myAccessCityAccessMeGet } from '@networking/api/generated/city-access/city-access'
-import { listAssignmentsLguAssignmentsGet } from '@networking/api/generated/lgu-assignments/lgu-assignments'
+import {
+  listAssignmentsLguAssignmentsGet,
+  getCityByUserLguAssignmentsUserUserIdCityGet,
+} from '@networking/api/generated/lgu-assignments/lgu-assignments'
 import { router } from '@/router'
 import { AuthContext, type AuthAction, type AuthData, type AuthState } from '@/context/auth.context'
 import type { UserResponse } from '@networking/api/model/userResponse'
@@ -38,6 +41,7 @@ function authReducer(_state: AuthState, action: AuthAction): AuthState {
         role_name: action.role_name,
         permissions: action.permissions,
         city_ids: action.city_ids,
+        lgu_city: action.lgu_city,
       }
     case 'UNAUTHENTICATED':
       return { state: 'UNAUTHENTICATED' }
@@ -53,6 +57,7 @@ async function resolveAuth(user: UserResponse) {
   const permissions = role_name ? (ROLE_PERMISSIONS[role_name] ?? []) : []
 
   let city_ids: string[] = []
+  let lgu_city = undefined
   try {
     if (role_name === 'investor') {
       const accessRes = await myAccessCityAccessMeGet()
@@ -60,12 +65,14 @@ async function resolveAuth(user: UserResponse) {
     } else if (role_name === 'lgu_admin') {
       const assignRes = await listAssignmentsLguAssignmentsGet()
       city_ids = assignRes.data.filter(a => a.user_id === user.id).map(a => a.city_id)
+      const cityRes = await getCityByUserLguAssignmentsUserUserIdCityGet(user.id)
+      lgu_city = cityRes.data
     }
   } catch {
     // non-critical — proceed with empty city list
   }
 
-  return { user, role_name, permissions, city_ids }
+  return { user, role_name, permissions, city_ids, lgu_city }
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {

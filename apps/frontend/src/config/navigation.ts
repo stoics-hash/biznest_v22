@@ -11,6 +11,7 @@ import {
   Settings,
   Users,
   ShieldCheck,
+    LandPlotIcon
 } from 'lucide-react'
 
 export type NavItem = {
@@ -42,6 +43,7 @@ export const lguNavSections: NavSection[] = [
       { title: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
       { title: 'Cities', to: '/cities', icon: Building2 },
       { title: 'Map', to: '/map', icon: Map },
+      {title: 'Zoning', to: '/zoning', icon: LandPlotIcon },
       { title: 'Alerts', to: '/alerts', icon: Bell },
       { title: 'Data', to: '/data', icon: Database },
     ],
