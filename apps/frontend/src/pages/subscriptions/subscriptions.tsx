@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
-import { CreditCard, MapPin, CheckCircle2 } from 'lucide-react'
+import { CreditCard, MapPin, CheckCircle2, ArrowUpCircle } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useSubscription } from './composables/use-subscription'
@@ -38,9 +39,17 @@ export function SubscriptionsPage() {
         <>
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <CreditCard className="size-5 text-muted-foreground" />
-                <CardTitle className="text-base">Current Plan</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="size-5 text-muted-foreground" />
+                  <CardTitle className="text-base">Current Plan</CardTitle>
+                </div>
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link to="/subscriptions/upgrade">
+                    <ArrowUpCircle className="size-4" />
+                    Upgrade
+                  </Link>
+                </Button>
               </div>
               <CardDescription>Your active investment platform subscription</CardDescription>
             </CardHeader>

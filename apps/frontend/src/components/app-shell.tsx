@@ -35,6 +35,7 @@ import {
   investorNavSections,
   lguNavSections,
   defaultNavSections,
+  administrationNavSections,
   type NavSection,
 } from '@/config/navigation'
 
@@ -161,12 +162,16 @@ export function AppShell() {
   const isMapPath = MAP_PATHS.some(p => location.pathname.startsWith(p))
   const { user, role_name, city_ids } = state
 
-  const sections =
+  const baseSections =
     role_name === 'investor'
       ? investorNavSections
       : role_name === 'lgu_admin'
         ? lguNavSections
         : defaultNavSections
+
+  const sections = user.is_superuser
+    ? [...baseSections, ...administrationNavSections]
+    : baseSections
 
   return (
     <TooltipProvider delayDuration={0}>

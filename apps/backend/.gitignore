@@ -8,6 +8,7 @@ __pycache__/
 
 # Seed data
 boundaries/
+geo_hazard/
 
 # Distribution / packaging
 .Python
@@ -40,7 +41,6 @@ ENV/
 # Hazard data - seed it on your owwn using the convert_hazard_data.py and seed_note_data.py scripts
 hazard_data/
 geo_hazard/
-
 
 # IDEs
 .idea/

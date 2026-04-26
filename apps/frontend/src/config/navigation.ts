@@ -9,6 +9,8 @@ import {
   Database,
   ScrollText,
   Settings,
+  Users,
+  ShieldCheck,
 } from 'lucide-react'
 
 export type NavItem = {
@@ -63,10 +65,14 @@ export const defaultNavSections: NavSection[] = [
   },
 ]
 
-export const guestNavItems: { title: string; to: string }[] = [
-  { title: 'Home', to: '/' },
-  { title: 'Sign in', to: '/login' },
-  { title: 'Register', to: '/register' },
+export const administrationNavSections: NavSection[] = [
+  {
+    title: 'Administration',
+    items: [
+      { title: 'User Management', to: '/admin/user-management', icon: Users },
+      { title: 'Role & Permissions', to: '/admin/role-permissions', icon: ShieldCheck },
+    ],
+  },
 ]
 
 export { Map as BrandIcon }
