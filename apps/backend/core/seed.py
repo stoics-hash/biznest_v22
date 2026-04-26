@@ -17,7 +17,7 @@ DEFAULT_PLANS = [
 ]
 
 DEFAULT_PERMISSIONS = [
-    ("city:view",             "View city data"),
+    ("manage:city",             "Can manage city data"),
     ("zoning:read",           "View zoning areas"),
     ("zoning:write",          "Create and edit zoning areas"),
     ("hazard:read",           "View hazard areas"),
@@ -28,11 +28,12 @@ DEFAULT_PERMISSIONS = [
     ("alert:write",           "Create and manage alerts"),
     ("analytics:view",        "View investment analytics"),
     ("location:save",         "Save personal locations"),
+    ("manage:user",           "Manage  user and role"),
+    ("manage:role",            "Manage role and  permissions")
 ]
 
 ROLES = {
     "investor": [
-        "city:view",
         "zoning:read",
         "hazard:read",
         "establishment:read",
@@ -41,7 +42,7 @@ ROLES = {
         "location:save",
     ],
     "lgu_admin": [
-        "city:view",
+        "manage:city",
         "zoning:read",
         "zoning:write",
         "hazard:read",
@@ -52,6 +53,21 @@ ROLES = {
         "alert:write",
         "analytics:view",
         "location:save",
+    ],
+    "admin": [
+        "manage:city",
+        "zoning:read",
+        "zoning:write",
+        "hazard:read",
+        "hazard:write",
+        "establishment:read",
+        "establishment:write",
+        "alert:read",
+        "alert:write",
+        "analytics:view",
+        "location:save",
+        "manage:user",
+        "manage:role",
     ],
 }
 
