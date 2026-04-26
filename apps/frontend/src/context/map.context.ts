@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { MapEngine } from '@/engine/map.engine'
+import type { MapEngine, HazardTile } from '@/engine/map.engine'
 
 export type LightPreset = 'dawn' | 'day' | 'dusk' | 'night'
 
@@ -10,6 +10,12 @@ export interface MapData {
   setLightPreset: (preset: LightPreset) => void
   show3D: boolean
   setShow3D: (v: boolean) => void
+  /** Hazard PMTile layers loaded for the current province. */
+  hazardLayers: HazardTile[]
+  /** Keys of currently visible hazard layers (use `engine.hazardKey(tile)` to build keys). */
+  visibleHazardKeys: Set<string>
+  /** Toggle a single hazard layer on or off by its key. */
+  toggleHazard: (key: string) => void
 }
 
 export const MapContext = createContext<MapData>({
@@ -19,6 +25,9 @@ export const MapContext = createContext<MapData>({
   setLightPreset: () => {},
   show3D: true,
   setShow3D: () => {},
+  hazardLayers: [],
+  visibleHazardKeys: new Set(),
+  toggleHazard: () => {},
 })
 
 export const useMapContext = () => useContext(MapContext)

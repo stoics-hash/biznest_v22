@@ -11,6 +11,14 @@ export type BoundaryGeometry = {
   coordinates: number[][][][]
 }
 
+export interface HazardTile {
+  hazard_type: string
+  scenario: string | null
+  pmtile_url: string
+  /** Source layer name read from the PMTile metadata — populated by MapProvider. */
+  source_layer?: string
+}
+
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY as string
 
 // Register PMTiles protocol once at module load.
@@ -32,16 +40,29 @@ const LIGHT_PRESETS: Record<LightPreset, maplibregl.LightSpecification> = {
   night: { anchor: 'viewport', color: '#001a33', intensity: 0.6  },
 }
 
-const CITY_MASK_SOURCE    = 'city-restriction-mask'
-const CITY_BOUND_SOURCE   = 'city-boundary'
-const CITY_MASK_LAYER     = 'city-restriction-overlay'
-const CITY_BOUND_LAYER    = 'city-boundary-outline'
+const CITY_BOUND_SOURCE = 'city-boundary'
+const CITY_BOUND_LAYER  = 'city-boundary-outline'
+
+// Tippecanoe source-layer names baked into each PMTile.
+// NOAH hazards: seeded from "slice.geojson" → layer = "slice".
+// Faultlines:   seeded from "faultline.geojson" → layer = "faultline".
+const HAZARD_SOURCE_LAYER: Record<string, string> = { faultline: 'faultline' }
+const DEFAULT_HAZARD_SOURCE_LAYER = 'slice'
+
+const HAZARD_COLORS: Record<string, string> = {
+  flood:       '#3b82f6',
+  landslide:   '#f97316',
+  storm_surge: '#8b5cf6',
+  debris_flow: '#a16207',
+  faultline:   '#ef4444',
+}
 
 export class MapEngine {
   private readonly _map: maplibregl.Map
   private readonly _markers = new Map<string, maplibregl.Marker>()
   private readonly _popups = new Map<string, maplibregl.Popup>()
   private _cityBoundary: BoundaryGeometry | null = null
+  private readonly _hazardKeys = new Set<string>()
 
   constructor(map: maplibregl.Map) {
     this._map = map
@@ -286,7 +307,8 @@ export class MapEngine {
    */
   flyToCityBoundary(boundary: BoundaryGeometry): this {
     const [w, s, e, n] = this._bbox(boundary)
-    this._map.fitBounds([[w, s], [e, n]], { padding: 60, maxZoom: 14, duration: 1200 })
+    // maxZoom: 16 ≈ 1 km ground scale at typical viewport width
+    this._map.fitBounds([[w, s], [e, n]], { padding: 60, maxZoom: 16, duration: 1200 })
     return this
   }
 
@@ -296,7 +318,6 @@ export class MapEngine {
    */
   setCityBoundary(boundary: BoundaryGeometry): this {
     if (!this._map.isStyleLoaded()) {
-      // Style not ready yet — defer until the map is fully idle.
       this._map.once('idle', () => this.setCityBoundary(boundary))
       return this
     }
@@ -304,30 +325,12 @@ export class MapEngine {
     this.clearCityBoundary()
     this._cityBoundary = boundary
 
-    // Boundary outline source
     this._map.addSource(CITY_BOUND_SOURCE, {
       type: 'geojson',
       data: { type: 'Feature', geometry: boundary as never, properties: {} },
     })
 
-    // World-minus-city mask source (polygon with holes)
-    this._map.addSource(CITY_MASK_SOURCE, {
-      type: 'geojson',
-      data: this._buildWorldMask(boundary) as never,
-    })
-
-    // Gray desaturating fill outside city boundary
-    this._map.addLayer({
-      id: CITY_MASK_LAYER,
-      type: 'fill',
-      source: CITY_MASK_SOURCE,
-      paint: {
-        'fill-color': '#6b7280',
-        'fill-opacity': 0.72,
-      },
-    })
-
-    // City boundary outline
+    // Blue dashed boundary outline only — no grayscale fill overlay
     this._map.addLayer({
       id: CITY_BOUND_LAYER,
       type: 'line',
@@ -349,12 +352,94 @@ export class MapEngine {
    * Removes the city boundary overlay and restriction.
    */
   clearCityBoundary(): this {
-    this.removeLayer(CITY_MASK_LAYER)
     this.removeLayer(CITY_BOUND_LAYER)
-    this.removeSource(CITY_MASK_SOURCE)
     this.removeSource(CITY_BOUND_SOURCE)
     this._cityBoundary = null
     this._map.setMaxBounds(null)
+    this._map.setMinZoom(0)
+    return this
+  }
+
+  // ── Hazard PMTile layers ──────────────────────────────────────────────────────
+
+  /** Stable key for a hazard tile, used for source/layer IDs and visibility toggling. */
+  hazardKey(tile: Pick<HazardTile, 'hazard_type' | 'scenario'>): string {
+    return `${tile.hazard_type}::${tile.scenario ?? 'all'}`
+  }
+
+  /**
+   * Loads all hazard PMTile sources and layers.
+   * Renders below the city-restriction overlay so the gray mask dims
+   * hazard areas outside the city boundary.
+   * Re-entrant: clears existing hazard layers before loading new ones.
+   */
+  setHazardLayers(tiles: HazardTile[]): this {
+    if (!this._map.isStyleLoaded()) {
+      this._map.once('idle', () => this.setHazardLayers(tiles))
+      return this
+    }
+
+    this.clearHazardLayers()
+
+    // Insert hazard layers beneath the boundary outline so the outline stays on top.
+    const beforeId = this._map.getLayer(CITY_BOUND_LAYER) ? CITY_BOUND_LAYER : undefined
+
+    for (const tile of tiles) {
+      const key      = this.hazardKey(tile)
+      const sourceId = `hazard-src-${key}`
+      const layerId  = `hazard-lyr-${key}`
+      const srcLayer = tile.source_layer ?? HAZARD_SOURCE_LAYER[tile.hazard_type] ?? DEFAULT_HAZARD_SOURCE_LAYER
+      const color    = HAZARD_COLORS[tile.hazard_type] ?? '#6b7280'
+
+      this._map.addSource(sourceId, {
+        type: 'vector',
+        url: `pmtiles://${tile.pmtile_url}`,
+      })
+
+      if (tile.hazard_type === 'faultline') {
+        this._map.addLayer({
+          id: layerId,
+          type: 'line',
+          source: sourceId,
+          'source-layer': srcLayer,
+          paint: {
+            'line-color': color,
+            'line-width': 2,
+            'line-opacity': 0.9,
+          },
+        }, beforeId)
+      } else {
+        this._map.addLayer({
+          id: layerId,
+          type: 'fill',
+          source: sourceId,
+          'source-layer': srcLayer,
+          paint: {
+            'fill-color': color,
+            'fill-opacity': this._hazardOpacity(tile.scenario),
+          },
+        }, beforeId)
+      }
+
+      this._hazardKeys.add(key)
+    }
+
+    return this
+  }
+
+  /** Remove all hazard layers and their sources from the map. */
+  clearHazardLayers(): this {
+    for (const key of this._hazardKeys) {
+      this.removeLayer(`hazard-lyr-${key}`)
+      this.removeSource(`hazard-src-${key}`)
+    }
+    this._hazardKeys.clear()
+    return this
+  }
+
+  /** Show or hide a single hazard layer by its key (`hazardKey(tile)`). */
+  setHazardLayerVisible(key: string, visible: boolean): this {
+    this.setLayerVisibility(`hazard-lyr-${key}`, visible)
     return this
   }
 
@@ -375,10 +460,25 @@ export class MapEngine {
   destroy(): void {
     this.clearMarkers()
     this.clearPopups()
+    this.clearHazardLayers()
     this.clearCityBoundary()
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────────
+
+  /** Fill opacity by scenario — deeper events render more opaque. */
+  private _hazardOpacity(scenario: string | null): number {
+    switch (scenario) {
+      case '5yr':   return 0.30
+      case '25yr':  return 0.45
+      case '100yr': return 0.60
+      case 'ssa1':  return 0.30
+      case 'ssa2':  return 0.40
+      case 'ssa3':  return 0.50
+      case 'ssa4':  return 0.60
+      default:      return 0.45
+    }
+  }
 
   /**
    * Lock panning to the city bbox + a small buffer so the user cannot browse
@@ -388,6 +488,8 @@ export class MapEngine {
     const [w, s, e, n] = this._bbox(boundary)
     const buf = 0.3
     this._map.setMaxBounds([[w - buf, s - buf], [e + buf, n + buf]])
+    // Prevent zooming out past ~10 km so the city stays in focus
+    this._map.setMinZoom(11)
   }
 
   /** Compute [west, south, east, north] bounding box of a boundary geometry. */
@@ -407,34 +509,6 @@ export class MapEngine {
       boundary.coordinates.forEach(poly => poly.forEach(visit))
     }
     return [w, s, e, n]
-  }
-
-  /**
-   * Builds a GeoJSON Polygon that covers the whole world with the city boundary
-   * punched out as a hole, creating the outside-city overlay geometry.
-   *
-   * The world outer ring is CCW; city rings are reversed (CW) to act as holes
-   * under the non-zero fill rule.
-   */
-  private _buildWorldMask(boundary: BoundaryGeometry): object {
-    const worldRing: number[][] = [
-      [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
-    ]
-
-    const holes: number[][][] = []
-    if (boundary.type === 'Polygon') {
-      holes.push([...boundary.coordinates[0]].reverse())
-    } else {
-      for (const poly of boundary.coordinates) {
-        holes.push([...poly[0]].reverse())
-      }
-    }
-
-    return {
-      type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [worldRing, ...holes] },
-      properties: {},
-    }
   }
 
   /** Ray-casting point-in-polygon for a single ring. */

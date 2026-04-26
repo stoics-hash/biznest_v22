@@ -7,7 +7,7 @@ shapely
 requests
 pydantic[email]
 python-jose[cryptography]
-minio
+minio>=7.2.0
 alembic
 python-dotenv
 fiona
