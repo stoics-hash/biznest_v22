@@ -60,7 +60,6 @@ export function Map({
       setEngine(engine)
     })
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100 }), 'bottom-left')
     map.addControl(new maplibregl.FullscreenControl(), 'top-right')
 
