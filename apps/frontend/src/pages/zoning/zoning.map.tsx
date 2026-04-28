@@ -62,7 +62,7 @@ function ZoningMap({ children }: PropsWithChildren) {
     if (!boundary) return
     engine.flyToCityBoundary(boundary)
     engine.setCityBoundary(boundary)
-  }, [engine, selectedCity?.id])
+  }, [engine, selectedCity, selectedCity?.id])
 
   return (
     // Override the outer MapContext — children see this engine, not MapProvider's

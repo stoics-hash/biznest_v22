@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import {useState, useCallback, useRef, useEffect} from 'react'
 import { useMapContext } from '@/context/map.context'
 import type { ImageCorners } from '@/engine/map.engine'
 
@@ -32,7 +32,11 @@ export interface GeoreferenceState {
 export function useGeoreference() {
   const { engine } = useMapContext()
   const engineRef = useRef(engine)
-  engineRef.current = engine
+
+  useEffect(() => {
+    engineRef.current = engine
+  }, [engine]);
+
 
   const [state, setState] = useState<GeoreferenceState>({
     imageUrl: null, imageName: null, corners: null,
