@@ -1,6 +1,7 @@
-import { AlertTriangle, LayoutGrid, Waves, Mountain, CloudLightning, Zap, Layers, X } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, Waves, Mountain, CloudLightning, Zap, Layers, X, Plus, Upload, PenLine, Plug, ScanText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
 import type { HazardTile } from '@/engine/map.engine'
@@ -10,6 +11,14 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +149,7 @@ function ZoningPanel() {
 export function HazardControls() {
   const { hazardLayers, visibleHazardKeys, toggleHazard, engine } = useMapContext()
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
+  const navigate = useNavigate()
 
   const groups: HazardGroup[] = Object.entries(HAZARD_META)
     .filter(([type]) => hazardLayers.some(t => t.hazard_type === type))
@@ -180,15 +190,58 @@ export function HazardControls() {
               <CardTitle className="text-sm font-semibold">
                 {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
               </CardTitle>
-              {/* Add  the plus button here to create a hazard or zoning data*/}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 text-muted-foreground hover:text-foreground -mr-1"
-                onClick={() => setActivePanel(null)}
-              >
-                <X className="size-3.5" />
-              </Button>
+              <div className="flex items-center gap-0.5 -mr-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
+                      <Plus className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" side="bottom" className="w-52">
+                    {activePanel === 'hazard' ? (
+                      <>
+                        <DropdownMenuLabel className="text-xs">Add Hazard Data</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Upload className="size-4" />
+                          Upload file
+                          <span className="ml-auto text-[10px] text-muted-foreground">GeoJSON / ZIP</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <PenLine className="size-4" />
+                          Manual entry
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Plug className="size-4" />
+                          Through API
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuLabel className="text-xs">Add Zoning Data</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}>
+                          <ScanText className="size-4" />
+                          OCR + Georeferencing
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <PenLine className="size-4" />
+                          Manual entry
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => setActivePanel(null)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
 

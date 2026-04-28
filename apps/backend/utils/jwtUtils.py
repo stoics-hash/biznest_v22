@@ -5,6 +5,10 @@ import json
 import time
 from typing import Optional
 
+
+def hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
 from core.db import SessionLocal
 
 

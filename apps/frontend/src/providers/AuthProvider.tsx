@@ -1,9 +1,12 @@
-import { useReducer, useEffect, type PropsWithChildren } from 'react'
+import { useReducer, useEffect, useRef, type PropsWithChildren } from 'react'
+import axios from 'axios'
+import { tokenManager } from '@/lib/axios'
 import {
   currentUserUsersMeGet,
   loginUsersLoginPost,
   logoutUsersLogoutPost,
   registerUsersRegisterPost,
+  refreshUsersRefreshPost,
 } from '@networking/api/generated/users/users'
 import { getUserRolesUserRolesUserIdGet, assignRoleUserRolesPost } from '@networking/api/generated/user-roles/user-roles'
 import { listRolesRolesGet } from '@networking/api/generated/roles/roles'
@@ -29,6 +32,10 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'location:save',
   ],
 }
+
+const AUTH_PATHS = ['/users/login', '/users/register', '/users/refresh', '/users/lgu/register']
+
+type QueueItem = { resolve: (value: unknown) => void; reject: (err: unknown) => void }
 
 function authReducer(_state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
@@ -78,8 +85,62 @@ async function resolveAuth(user: UserResponse) {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(authReducer, { state: 'BOOT' } as AuthState)
 
+  // refresh_token stored in memory only — never in React state or localStorage
+  const refreshTokenRef = useRef<string | null>(null)
+  const isRefreshingRef = useRef(false)
+  const refreshQueueRef = useRef<QueueItem[]>([])
+
   useEffect(() => {
+    const interceptorId = axios.interceptors.response.use(
+      (res) => res,
+      async (error) => {
+        const originalRequest = error.config
+        const isAuthPath = AUTH_PATHS.some(p => (originalRequest?.url as string | undefined)?.includes(p))
+
+        if (error.response?.status !== 401 || isAuthPath || originalRequest?._retry) {
+          return Promise.reject(error)
+        }
+
+        if (isRefreshingRef.current) {
+          return new Promise((resolve, reject) => {
+            refreshQueueRef.current.push({
+              resolve: () => resolve(axios(originalRequest)),
+              reject,
+            })
+          })
+        }
+
+        originalRequest._retry = true
+        isRefreshingRef.current = true
+
+        try {
+          const refreshRes = await refreshUsersRefreshPost({
+            refresh_token: refreshTokenRef.current ?? undefined,
+          })
+          tokenManager.set(refreshRes.data.access_token)
+          refreshTokenRef.current = refreshRes.data.refresh_token
+          refreshQueueRef.current.forEach(q => q.resolve(undefined))
+          refreshQueueRef.current = []
+          return axios(originalRequest)
+        } catch (refreshError) {
+          refreshQueueRef.current.forEach(q => q.reject(refreshError))
+          refreshQueueRef.current = []
+          refreshTokenRef.current = null
+          tokenManager.clear()
+          dispatch({ type: 'UNAUTHENTICATED' })
+          void router.navigate({ to: '/login' })
+          return Promise.reject(refreshError)
+        } finally {
+          isRefreshingRef.current = false
+        }
+      }
+    )
+
     void restoreSession()
+
+    return () => {
+      axios.interceptors.response.eject(interceptorId)
+    }
   }, [])
 
   async function restoreSession() {
@@ -94,7 +155,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function signIn(username: string, password: string) {
-    await loginUsersLoginPost({ username, password })
+    const loginRes = await loginUsersLoginPost({ username, password })
+    tokenManager.set(loginRes.data.access_token)
+    refreshTokenRef.current = loginRes.data.refresh_token
     const userRes = await currentUserUsersMeGet()
     const result = await resolveAuth(userRes.data)
     dispatch({ type: 'AUTH_SUCCESS', ...result })
@@ -102,7 +165,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function register(email: string, username: string, password: string, role: 'investor' | 'lgu_admin' = 'investor') {
-    await registerUsersRegisterPost({ email, username, password })
+    const registerRes = await registerUsersRegisterPost({ email, username, password })
+    tokenManager.set(registerRes.data.access_token)
+    refreshTokenRef.current = registerRes.data.refresh_token
     const userRes = await currentUserUsersMeGet()
     const rolesRes = await listRolesRolesGet()
     const targetRole = rolesRes.data.find(r => r.name === role)
@@ -117,8 +182,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
   async function signOut() {
     dispatch({ type: 'SIGN_OUT' })
     try {
-      await logoutUsersLogoutPost()
+      await logoutUsersLogoutPost({ refresh_token: refreshTokenRef.current ?? undefined })
     } finally {
+      tokenManager.clear()
+      refreshTokenRef.current = null
       dispatch({ type: 'UNAUTHENTICATED' })
       await router.navigate({ to: '/login' })
     }

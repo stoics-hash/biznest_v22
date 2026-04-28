@@ -19,6 +19,9 @@ export interface HazardTile {
   source_layer?: string
 }
 
+/** Four corner coordinates in [lng, lat] order: top-left, top-right, bottom-right, bottom-left. */
+export type ImageCorners = [[number, number], [number, number], [number, number], [number, number]]
+
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY as string
 
 // Register PMTiles protocol once at module load.
@@ -63,6 +66,7 @@ export class MapEngine {
   private readonly _popups = new Map<string, maplibregl.Popup>()
   private _cityBoundary: BoundaryGeometry | null = null
   private readonly _hazardKeys = new Set<string>()
+  private readonly _imageOverlayIds = new Set<string>()
 
   constructor(map: maplibregl.Map) {
     this._map = map
@@ -455,12 +459,57 @@ export class MapEngine {
     return this._cityBoundary.coordinates.some(poly => this._pointInRing(lng, lat, poly[0]))
   }
 
+  // ── Image overlays (georeferencing) ──────────────────────────────────────────
+
+  /** Add a raster image overlay. corners = [TL, TR, BR, BL] in [lng, lat]. */
+  addImageOverlay(id: string, url: string, corners: ImageCorners): this {
+    if (!this._map.isStyleLoaded()) {
+      this._map.once('idle', () => this.addImageOverlay(id, url, corners))
+      return this
+    }
+    this.removeImageOverlay(id)
+    const srcId = `img-src-${id}`
+    const lyrId = `img-lyr-${id}`
+    this._map.addSource(srcId, { type: 'image', url, coordinates: corners })
+    this._map.addLayer({ id: lyrId, type: 'raster', source: srcId, paint: { 'raster-opacity': 0.75 } })
+    this._imageOverlayIds.add(id)
+    return this
+  }
+
+  /** Update the four corners of an existing image overlay. */
+  updateImageOverlay(id: string, corners: ImageCorners): this {
+    const source = this._map.getSource(`img-src-${id}`) as maplibregl.ImageSource | undefined
+    source?.setCoordinates(corners)
+    return this
+  }
+
+  setImageOverlayOpacity(id: string, opacity: number): this {
+    return this.setPaintProperty(`img-lyr-${id}`, 'raster-opacity', opacity)
+  }
+
+  removeImageOverlay(id: string): this {
+    this.removeLayer(`img-lyr-${id}`)
+    this.removeSource(`img-src-${id}`)
+    this._imageOverlayIds.delete(id)
+    return this
+  }
+
+  clearImageOverlays(): this {
+    for (const id of this._imageOverlayIds) {
+      this.removeLayer(`img-lyr-${id}`)
+      this.removeSource(`img-src-${id}`)
+    }
+    this._imageOverlayIds.clear()
+    return this
+  }
+
   // ── Cleanup ──────────────────────────────────────────────────────────────────
 
   destroy(): void {
     this.clearMarkers()
     this.clearPopups()
     this.clearHazardLayers()
+    this.clearImageOverlays()
     this.clearCityBoundary()
   }
 

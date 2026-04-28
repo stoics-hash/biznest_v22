@@ -1,17 +1,16 @@
-import type { LucideIcon } from 'lucide-react'
+import type {LucideIcon} from 'lucide-react'
 import {
-  LayoutDashboard,
-  Map,
+  Bell,
+  Bookmark,
   Building2,
   CreditCard,
-  Bookmark,
-  Bell,
   Database,
+  LayoutDashboard,
+  Map,
   ScrollText,
   Settings,
-  Users,
   ShieldCheck,
-    LandPlotIcon
+  Users
 } from 'lucide-react'
 
 export type NavItem = {
@@ -43,7 +42,6 @@ export const lguNavSections: NavSection[] = [
       { title: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
       { title: 'Cities', to: '/cities', icon: Building2 },
       { title: 'Map', to: '/map', icon: Map },
-      {title: 'Zoning', to: '/zoning', icon: LandPlotIcon },
       { title: 'Alerts', to: '/alerts', icon: Bell },
       { title: 'Data', to: '/data', icon: Database },
     ],

@@ -32,6 +32,8 @@ import type {
   LguInviteResponse,
   LguRegisterRequest,
   LoginRequest,
+  LogoutRequest,
+  RefreshRequest,
   RegisterRequest,
   TokenVerifyResponse,
   UserResponse,
@@ -167,23 +169,84 @@ export const useLoginUsersLoginPost = <TError = AxiosError<HTTPValidationError>,
       return useMutation(getLoginUsersLoginPostMutationOptions(options));
     }
     /**
- * @summary Logout
+ * @summary Refresh
  */
-export const logoutUsersLogoutPost = (
-     options?: AxiosRequestConfig
- ): Promise<AxiosResponse<void>> => {
+export const refreshUsersRefreshPost = (
+    refreshRequest: RefreshRequest, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<AuthResponse>> => {
 
 
     return axios.default.post(
-      `/users/logout`,undefined,options
+      `/users/refresh`,
+      refreshRequest,options
     );
   }
 
 
 
-export const getLogoutUsersLogoutPostMutationOptions = <TError = AxiosError<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, TError,void, TContext>, axios?: AxiosRequestConfig}
-): UseMutationOptions<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, TError,void, TContext> => {
+export const getRefreshUsersRefreshPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshUsersRefreshPost>>, TError,{data: RefreshRequest}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof refreshUsersRefreshPost>>, TError,{data: RefreshRequest}, TContext> => {
+
+const mutationKey = ['refreshUsersRefreshPost'];
+const {mutation: mutationOptions, axios: axiosOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, axios: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refreshUsersRefreshPost>>, {data: RefreshRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  refreshUsersRefreshPost(data,axiosOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefreshUsersRefreshPostMutationResult = NonNullable<Awaited<ReturnType<typeof refreshUsersRefreshPost>>>
+    export type RefreshUsersRefreshPostMutationBody = RefreshRequest
+    export type RefreshUsersRefreshPostMutationError = AxiosError<HTTPValidationError>
+
+    /**
+ * @summary Refresh
+ */
+export const useRefreshUsersRefreshPost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshUsersRefreshPost>>, TError,{data: RefreshRequest}, TContext>, axios?: AxiosRequestConfig}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof refreshUsersRefreshPost>>,
+        TError,
+        {data: RefreshRequest},
+        TContext
+      > => {
+      return useMutation(getRefreshUsersRefreshPostMutationOptions(options));
+    }
+    /**
+ * @summary Logout
+ */
+export const logoutUsersLogoutPost = (
+    logoutRequest: LogoutRequest, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<void>> => {
+
+
+    return axios.default.post(
+      `/users/logout`,
+      logoutRequest,options
+    );
+  }
+
+
+
+export const getLogoutUsersLogoutPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, TError,{data: LogoutRequest}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, TError,{data: LogoutRequest}, TContext> => {
 
 const mutationKey = ['logoutUsersLogoutPost'];
 const {mutation: mutationOptions, axios: axiosOptions} = options ?
@@ -195,10 +258,10 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, {data: LogoutRequest}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  logoutUsersLogoutPost(axiosOptions)
+          return  logoutUsersLogoutPost(data,axiosOptions)
         }
 
 
@@ -209,21 +272,80 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type LogoutUsersLogoutPostMutationResult = NonNullable<Awaited<ReturnType<typeof logoutUsersLogoutPost>>>
-
-    export type LogoutUsersLogoutPostMutationError = AxiosError<unknown>
+    export type LogoutUsersLogoutPostMutationBody = LogoutRequest
+    export type LogoutUsersLogoutPostMutationError = AxiosError<HTTPValidationError>
 
     /**
  * @summary Logout
  */
-export const useLogoutUsersLogoutPost = <TError = AxiosError<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, TError,void, TContext>, axios?: AxiosRequestConfig}
+export const useLogoutUsersLogoutPost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutUsersLogoutPost>>, TError,{data: LogoutRequest}, TContext>, axios?: AxiosRequestConfig}
  ): UseMutationResult<
         Awaited<ReturnType<typeof logoutUsersLogoutPost>>,
+        TError,
+        {data: LogoutRequest},
+        TContext
+      > => {
+      return useMutation(getLogoutUsersLogoutPostMutationOptions(options));
+    }
+    /**
+ * @summary Logout All
+ */
+export const logoutAllUsersLogoutAllPost = (
+     options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<void>> => {
+
+
+    return axios.default.post(
+      `/users/logout-all`,undefined,options
+    );
+  }
+
+
+
+export const getLogoutAllUsersLogoutAllPostMutationOptions = <TError = AxiosError<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAllUsersLogoutAllPost>>, TError,void, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutAllUsersLogoutAllPost>>, TError,void, TContext> => {
+
+const mutationKey = ['logoutAllUsersLogoutAllPost'];
+const {mutation: mutationOptions, axios: axiosOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, axios: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutAllUsersLogoutAllPost>>, void> = () => {
+
+
+          return  logoutAllUsersLogoutAllPost(axiosOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutAllUsersLogoutAllPostMutationResult = NonNullable<Awaited<ReturnType<typeof logoutAllUsersLogoutAllPost>>>
+
+    export type LogoutAllUsersLogoutAllPostMutationError = AxiosError<unknown>
+
+    /**
+ * @summary Logout All
+ */
+export const useLogoutAllUsersLogoutAllPost = <TError = AxiosError<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAllUsersLogoutAllPost>>, TError,void, TContext>, axios?: AxiosRequestConfig}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutAllUsersLogoutAllPost>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getLogoutUsersLogoutPostMutationOptions(options));
+      return useMutation(getLogoutAllUsersLogoutAllPostMutationOptions(options));
     }
     /**
  * @summary Current User

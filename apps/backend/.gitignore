@@ -51,6 +51,7 @@ geo_hazard/
 
 # Environment variables
 .env
+.credentials/
 
 # Testing
 .pytest_cache/

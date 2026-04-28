@@ -1,12 +1,11 @@
 import os
 import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
+from core.db import ACCESS_TOKEN_EXPIRE_SECONDS
 from dto.UserDto import AuthResponse, LguInviteRequest, LguInviteResponse, LguRegisterRequest
 from models.city import City
 from models.lgu_assignment import LguAssignment
@@ -14,9 +13,8 @@ from models.lgu_invitation import LguInvitation
 from models.role import Role
 from models.user import User
 from models.user_role import UserRole
-from services.auth_service import set_auth_cookie
 from utils.email_utils import send_lgu_invite_email
-from utils.jwtUtils import create_jwt, hash_password
+from utils.jwtUtils import hash_password
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3001")
 LGU_INVITE_EXPIRE_HOURS = int(os.environ.get("LGU_INVITE_EXPIRE_HOURS", "24"))
@@ -134,20 +132,9 @@ def register_from_token(payload: LguRegisterRequest, response: Response, db: Ses
     db.commit()
     db.refresh(user)
 
-    now = int(time.time())
-    jwt_token = create_jwt(
-        {
-            "sub": str(user.id),
-            "username": user.username,
-            "email": user.email,
-            "iat": now,
-            "exp": now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
-        },
-        key=SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
-    set_auth_cookie(response, jwt_token)
-    return AuthResponse(id=user.id, email=user.email, username=user.username, token=jwt_token)
+    from services.user_service import create_auth_session, _auth_response
+    access_token, raw_refresh = create_auth_session(user, response, db)
+    return _auth_response(user, access_token, raw_refresh)
 
 
 def _get_valid_invitation(token: str, email: str, db: Session) -> LguInvitation:

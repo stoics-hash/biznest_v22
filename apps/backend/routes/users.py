@@ -1,20 +1,22 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from dto.UserDto import (
     AuthResponse,
     LoginRequest,
+    LogoutRequest,
     LguInviteRequest,
     LguInviteResponse,
     LguRegisterRequest,
+    RefreshRequest,
     RegisterRequest,
     TokenVerifyResponse,
     UserResponse,
 )
 from models.user import User
 from services import lgu_invitation_service, user_service
+from services.auth_service import get_authenticated_user, get_refresh_token
 from utils.jwtUtils import get_db
-from services.auth_service import get_authenticated_user
 
 router = APIRouter(tags=["users"])
 
@@ -29,9 +31,37 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
     return user_service.login(payload, response, db)
 
 
+@router.post("/refresh", response_model=AuthResponse)
+def refresh(
+    request: Request,
+    response: Response,
+    payload: RefreshRequest = Body(default_factory=RefreshRequest),
+    db: Session = Depends(get_db),
+):
+    raw = get_refresh_token(request, payload.refresh_token)
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required")
+    return user_service.refresh_tokens(raw, response, db)
+
+
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response):
-    user_service.logout(response)
+def logout(
+    request: Request,
+    response: Response,
+    payload: LogoutRequest = Body(default_factory=LogoutRequest),
+    db: Session = Depends(get_db),
+):
+    raw = get_refresh_token(request, payload.refresh_token)
+    user_service.logout(response, raw, db)
+
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+def logout_all(
+    response: Response,
+    auth_user: User = Depends(get_authenticated_user),
+    db: Session = Depends(get_db),
+):
+    user_service.logout_all(auth_user, response, db)
 
 
 @router.get("/me", response_model=UserResponse)
