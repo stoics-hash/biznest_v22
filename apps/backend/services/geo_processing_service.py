@@ -158,8 +158,15 @@ def get_zone_contours(
 def run_ocr(image_bytes: bytes) -> list[dict]:
     """
     Detect text with Google Vision (uses ADC — gcloud auth application-default login).
-    Returns [{text, cx, cy}] in pixel coordinates.
-    Falls back to [] on any error so the pipeline can continue without labels.
+
+    Vision API returns text_annotations where:
+      [0]  = full-page concatenated text  (skipped)
+      [1:] = individual word/token annotations, each with:
+               description  → the text string  (mapped to zone_type)
+               bounding_poly.vertices → 4 pixel-space corner points
+
+    Returns list of {text, cx, cy, vertices} dicts.
+    Falls back to [] on any error so the pipeline continues without labels.
     """
     try:
         from google.cloud import vision  # deferred — optional dependency
@@ -185,6 +192,8 @@ def run_ocr(image_bytes: bytes) -> list[dict]:
                 "text": text,
                 "cx": sum(xs) / len(xs),
                 "cy": sum(ys) / len(ys),
+                # All 4 bounding-poly corners for edge-case matching below
+                "vertices": [(x, y) for x, y in zip(xs, ys)],
             })
         return results
     except Exception:
@@ -192,23 +201,42 @@ def run_ocr(image_bytes: bytes) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Label assignment — OCR centroids → zones
+# Label assignment — OCR text → zone contours
 # ---------------------------------------------------------------------------
+
+def _point_in_contour(contour: np.ndarray, x: float, y: float) -> bool:
+    return cv2.pointPolygonTest(contour, (x, y), False) >= 0
+
 
 def assign_labels(
     contours_with_colors: list[tuple[np.ndarray, np.ndarray]],
     ocr_results: list[dict],
 ) -> list[str | None]:
     """
-    Point-in-polygon test: if an OCR text centroid falls inside a contour,
-    assign that text as the zone label. Multiple texts are space-joined.
+    Map Vision API descriptions to zone contours.
+
+    Strategy per annotation:
+      1. Test centroid (cx, cy) — covers most cases.
+      2. If centroid misses, test all 4 bounding-poly vertices — catches text
+         whose centroid lands on a zone edge or just outside a thin zone.
+
+    Texts are deduplicated per zone (Vision API sometimes emits the same
+    word twice from overlapping detections). Result is space-joined and
+    stored as zone_type, e.g. "MUNICIPALITY" or "RESIDENTIAL ZONE".
     """
     labels: list[str | None] = []
     for contour, _ in contours_with_colors:
-        texts = []
+        seen: set[str] = set()
+        texts: list[str] = []
         for ocr in ocr_results:
-            pt = (float(ocr["cx"]), float(ocr["cy"]))
-            if cv2.pointPolygonTest(contour, pt, False) >= 0:
+            inside = _point_in_contour(contour, ocr["cx"], ocr["cy"])
+            if not inside:
+                inside = any(
+                    _point_in_contour(contour, vx, vy)
+                    for vx, vy in ocr.get("vertices", [])
+                )
+            if inside and ocr["text"] not in seen:
+                seen.add(ocr["text"])
                 texts.append(ocr["text"])
         labels.append(" ".join(texts) if texts else None)
     return labels
@@ -314,7 +342,9 @@ def _run_tippecanoe(geojson_path: str, pmtile_path: str) -> bool:
 def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
     """
     Write GeoJSON → run tippecanoe (native or via WSL) → upload PMTile to MinIO.
-    Returns a presigned MinIO URL (5 h TTL) or None when tippecanoe unavailable.
+    Returns the MinIO object key or None when tippecanoe unavailable.
+    The object key is stable and can be persisted in the DB.
+    Use presign_pmtile() to get a time-limited download URL.
     Overwrites any existing zoning PMTile for this city.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -335,6 +365,11 @@ def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
             content_type="application/octet-stream",
         )
 
+    return object_key
+
+
+def presign_pmtile(object_key: str) -> str:
+    """Generate a presigned MinIO URL (5 h TTL) for a stored PMTile object key."""
     return minio_client.presigned_get_object(
         BUCKET_NAME,
         object_key,

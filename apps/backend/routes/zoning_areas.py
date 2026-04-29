@@ -8,6 +8,7 @@ from dto.ZoningAreaDto import (
     ZoningAreaResponse,
     ZoningAreaUpdate,
     ZoningImageProcessRequest,
+    ZoningPmtilesResponse,
     ZoningProcessResponse,
 )
 from models.user import User
@@ -60,6 +61,12 @@ def process_zoning_image(
     min_area_px: minimum contour area in pixels to keep (default 500).
     """
     return zoning_area_service.process_zoning_image(city_id, payload, current_user.id, db)
+
+
+@router.get("/{city_id}/zoning/pmtiles", response_model=ZoningPmtilesResponse)
+def get_zoning_pmtiles(city_id: UUID, db: Session = Depends(get_db)):
+    """Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile."""
+    return zoning_area_service.get_city_pmtile_url(city_id, db)
 
 
 @router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)

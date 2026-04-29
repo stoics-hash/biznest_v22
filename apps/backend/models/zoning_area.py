@@ -16,8 +16,9 @@ class ZoningArea(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     city_id = Column(UUID(as_uuid=True), ForeignKey("cities.id", ondelete="CASCADE"), nullable=False)
 
-    zone_type = Column(String(100))  # residential, commercial, industrial
+    zone_type = Column(String(100))
     geometry = Column(Geometry("GEOMETRY", srid=4326, spatial_index=True), nullable=True)
+    pmtile_url = Column(String(500), nullable=True)  # MinIO object key for city-level zoning PMTile
 
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

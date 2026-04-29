@@ -10,6 +10,7 @@ from dto.ZoningAreaDto import (
     ZoningAreaResponse,
     ZoningAreaUpdate,
     ZoningImageProcessRequest,
+    ZoningPmtilesResponse,
     ZoningProcessResponse,
 )
 from models.city import City
@@ -145,10 +146,21 @@ def process_zoning_image(
         except Exception:
             continue
 
-    pmtile_url = gps.generate_pmtiles(
+    object_key = gps.generate_pmtiles(
         {"type": "FeatureCollection", "features": features},
         city_id,
     )
+
+    # Persist the object key on ALL zones in the city so any zone query
+    # can surface the current PMTile without a separate lookup table.
+    if object_key:
+        db.query(ZoningArea).filter(ZoningArea.city_id == city_id).update(
+            {"pmtile_url": object_key},
+            synchronize_session="fetch",
+        )
+        db.commit()
+
+    presigned_url = gps.presign_pmtile(object_key) if object_key else None
 
     # Build response using Shapely polygons we already have (avoids WKB round-trip)
     zone_responses = [
@@ -157,6 +169,7 @@ def process_zoning_image(
             city_id=zone.city_id,
             zone_type=zone.zone_type,
             geometry=dict(mapping(poly)),
+            pmtile_url=object_key,
             created_by=zone.created_by,
             created_at=zone.created_at,
         )
@@ -166,6 +179,25 @@ def process_zoning_image(
     return ZoningProcessResponse(
         zones_created=len(created_zones),
         skipped_zones=skipped,
-        pmtile_url=pmtile_url,
+        pmtile_url=presigned_url,
         zones=zone_responses,
     )
+
+
+def get_city_pmtile_url(city_id: UUID, db: Session) -> ZoningPmtilesResponse:
+    """
+    Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile.
+    Raises 404 if no PMTile has been generated for this city yet.
+    """
+    zone = (
+        db.query(ZoningArea)
+        .filter(ZoningArea.city_id == city_id, ZoningArea.pmtile_url.isnot(None))
+        .first()
+    )
+    if not zone:
+        raise HTTPException(
+            status_code=404,
+            detail="No zoning PMTile found for this city. Run process-image first.",
+        )
+    presigned = gps.presign_pmtile(zone.pmtile_url)
+    return ZoningPmtilesResponse(pmtile_url=presigned, object_key=zone.pmtile_url)

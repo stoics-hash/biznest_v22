@@ -25,6 +25,7 @@ class ZoningAreaResponse(BaseModel):
     city_id: UUID
     zone_type: str | None
     geometry: dict[str, Any] | None
+    pmtile_url: str | None  # MinIO object key; use GET /zoning/pmtiles for a presigned URL
     created_by: UUID | None
     created_at: datetime
 
@@ -39,6 +40,11 @@ class ZoningAreaResponse(BaseModel):
             return dict(mapping(to_shape(v)))
         except Exception:
             return None
+
+
+class ZoningPmtilesResponse(BaseModel):
+    pmtile_url: str        # presigned MinIO URL (5 h TTL)
+    object_key: str        # raw MinIO object key for reference
 
 
 # --- Process-image DTOs ---
