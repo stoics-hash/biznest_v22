@@ -50,6 +50,8 @@ Route files in `src/apps/` are thin wrappers — they just import and render fro
 
 ### Provider stack (order matters)
 
+Entry point: `src/providers/AppProvider.tsx`.
+
 ```
 QueryClientProvider
   └─ AuthProvider          ← JWT auth, role/permission resolution
@@ -102,10 +104,25 @@ Key patterns:
 - `setCityBoundary(boundary)` — renders outside-city dark overlay + boundary outline; `clearCityBoundary()` removes both
 - `isInsideBoundary(lng, lat)` — point-in-polygon check using ray-casting (returns `true` when no boundary set)
 - `setTerrain(enabled)` — adds MapTiler DEM source and enables 3D terrain; requires `VITE_MAPTILER_KEY`
+- `addImageOverlay(id, url, corners)` / `updateImageOverlay(id, corners)` / `removeImageOverlay(id)` — raster image overlaid on the map using `ImageCorners` (4 `[lng, lat]` pairs: top-left, top-right, bottom-right, bottom-left)
+
+Hardcoded PMTile source-layer names: NOAH hazard tiles use `slice`, faultlines use `faultline`.
+
+### ZoningMap — own MapLibre instance
+
+`src/pages/zoning/zoning.map.tsx` creates its own `MapEngine` and overrides `MapContext` locally — it does **not** use the `MapEngine` from `MapProvider`. This is intentional: the zoning view needs full map control without the hazard-loading side effects from `MapProvider`. It still reads `lightPreset` and `show3D` from the outer `MapProvider` context to stay in sync with user preferences.
+
+The `useGeoreference` composable (`src/pages/zoning/composables/use-georeference.ts`) drives the image georeferencing feature: upload a raster image, position it on the map via draggable corners, adjust opacity/rotation, then save. It calls `engine.addImageOverlay` / `updateImageOverlay` / `removeImageOverlay`.
 
 ### Navigation config (`src/config/navigation.ts`)
 
-Role-specific nav sections: `investorNavSections`, `lguNavSections`, `defaultNavSections`. `guestNavItems` is a flat array for unauthenticated nav. When adding a new route that should appear in the sidebar, add it here — don't hard-code nav items in `app-shell.tsx`.
+Role-specific nav sections:
+- `investorNavSections` — investor sidebar (Dashboard, Cities, Map, Subscription, Saved Locations)
+- `lguNavSections` — LGU admin sidebar (Dashboard, Cities, Map, Alerts, Data + System group)
+- `defaultNavSections` — fallback for unrecognized roles
+- `administrationNavSections` — admin-only section (User Management, Role & Permissions); appended by `app-shell.tsx` for superusers
+
+When adding a route that should appear in the sidebar, add it to the relevant section here — don't hard-code nav items in `app-shell.tsx`.
 
 ### Data fetching
 

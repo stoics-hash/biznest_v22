@@ -30,6 +30,8 @@ Base.metadata.create_all(bind=engine)
 with SessionLocal() as db:
     seed(db)
 
+print("RUNNING MAIN FILE:  ", __file__)
+
 app = FastAPI(title="BizNest Geo-Intelligence API")
 
 app.add_middleware(

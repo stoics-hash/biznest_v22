@@ -32,33 +32,6 @@ def create_zoning_area(
 ):
     return zoning_area_service.create(city_id, payload, current_user.id, db)
 
-
-@router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
-def get_zoning_area(city_id: UUID, zone_id: UUID, db: Session = Depends(get_db)):
-    return zoning_area_service.get_or_404(zone_id, city_id, db)
-
-
-@router.patch("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
-def update_zoning_area(
-    city_id: UUID,
-    zone_id: UUID,
-    payload: ZoningAreaUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_authenticated_user),
-):
-    return zoning_area_service.update(zone_id, city_id, payload, db)
-
-
-@router.delete("/{city_id}/zoning/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_zoning_area(
-    city_id: UUID,
-    zone_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_authenticated_user),
-):
-    zoning_area_service.delete(zone_id, city_id, db)
-
-
 @router.post(
     "/{city_id}/zoning/process-image",
     response_model=ZoningProcessResponse,
@@ -87,3 +60,31 @@ def process_zoning_image(
     min_area_px: minimum contour area in pixels to keep (default 500).
     """
     return zoning_area_service.process_zoning_image(city_id, payload, current_user.id, db)
+
+
+@router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
+def get_zoning_area(city_id: UUID, zone_id: UUID, db: Session = Depends(get_db)):
+    return zoning_area_service.get_or_404(zone_id, city_id, db)
+
+
+@router.patch("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
+def update_zoning_area(
+    city_id: UUID,
+    zone_id: UUID,
+    payload: ZoningAreaUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_authenticated_user),
+):
+    return zoning_area_service.update(zone_id, city_id, payload, db)
+
+
+@router.delete("/{city_id}/zoning/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_zoning_area(
+    city_id: UUID,
+    zone_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_authenticated_user),
+):
+    zoning_area_service.delete(zone_id, city_id, db)
+
+
