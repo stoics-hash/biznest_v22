@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, type PropsWithChildren } from 'react'
 import { MapContext, type LightPreset } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
 import { listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
+import { getZoningPmtilesCitiesCityIdZoningPmtilesGet } from '@networking/api/generated/zoning/zoning'
 import type { MapEngine, BoundaryGeometry, HazardTile } from '@/engine/map.engine'
 
 // ── PMTile source-layer discovery ────────────────────────────────────────────
@@ -40,6 +41,9 @@ export function MapProvider({ children }: PropsWithChildren) {
   const [show3D, setShow3D] = useState(true)
   const [hazardLayers, setHazardLayersState] = useState<HazardTile[]>([])
   const [visibleHazardKeys, setVisibleHazardKeys] = useState<Set<string>>(new Set())
+  const [zoningPmtileUrl, setZoningPmtileUrl] = useState<string | null>(null)
+  const [zoningSourceLayer, setZoningSourceLayer] = useState<string | undefined>(undefined)
+  const [showZoning, setShowZoning] = useState(true)
 
   const { selectedCity } = useCityContext()
 
@@ -81,11 +85,7 @@ export function MapProvider({ children }: PropsWithChildren) {
   // PMTile URLs are presigned MinIO URLs (5-hour TTL); re-navigating refreshes them.
 
   useEffect(() => {
-    if (!selectedCity?.province_id) {
-      setHazardLayersState([])
-      setVisibleHazardKeys(new Set())
-      return
-    }
+    if (!selectedCity?.province_id) return
 
     let cancelled = false
 
@@ -101,8 +101,57 @@ export function MapProvider({ children }: PropsWithChildren) {
         // Province has no hazard data yet.
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      setHazardLayersState([])
+      setVisibleHazardKeys(new Set())
+    }
   }, [selectedCity?.province_id])
+
+  // ── Zoning PMTile fetch ───────────────────────────────────────────────────
+  // City-scoped (one PMTile per city). 404 = no zoning data yet.
+
+  useEffect(() => {
+    if (!selectedCity?.id) return
+
+    let cancelled = false
+
+    getZoningPmtilesCitiesCityIdZoningPmtilesGet(selectedCity.id)
+      .then(async res => {
+        if (cancelled) return
+        const url = res.data.pmtile_url
+        const sl = await discoverSourceLayer(url)
+        if (cancelled) return
+        setZoningPmtileUrl(url)
+        setZoningSourceLayer(sl ?? 'zoning')
+      })
+      .catch(() => {
+        // City has no zoning data yet — stay cleared.
+      })
+
+    return () => {
+      cancelled = true
+      setZoningPmtileUrl(null)
+      setZoningSourceLayer(undefined)
+    }
+  }, [selectedCity?.id])
+
+  // ── Load zoning layer into engine ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (!engine) return
+    if (!zoningPmtileUrl || !zoningSourceLayer) {
+      engine.clearZoningLayer()
+      return
+    }
+    engine.setZoningLayer(zoningPmtileUrl, zoningSourceLayer)
+  }, [engine, zoningPmtileUrl, zoningSourceLayer])
+
+  // ── Sync zoning visibility ────────────────────────────────────────────────
+
+  useEffect(() => {
+    engine?.setZoningLayerVisible(showZoning)
+  }, [engine, showZoning])
 
   // ── Load hazard layers into engine ────────────────────────────────────────
 
@@ -140,6 +189,9 @@ export function MapProvider({ children }: PropsWithChildren) {
       hazardLayers,
       visibleHazardKeys,
       toggleHazard,
+      zoningPmtileUrl,
+      showZoning,
+      setShowZoning,
     }}>
       {children}
     </MapContext.Provider>

@@ -1,10 +1,12 @@
-import { AlertTriangle, LayoutGrid, Waves, Mountain, CloudLightning, Zap, Layers, X, Plus, Upload, PenLine, Plug, ScanText } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, Waves, Mountain, CloudLightning, Zap, Layers, X, Plus, Upload, PenLine, Plug, ScanText, Loader2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
+import { useCityContext } from '@/context/city.context'
 import type { HazardTile } from '@/engine/map.engine'
+import { useListZoningAreasCitiesCityIdZoningGet } from '@networking/api/generated/zoning/zoning'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -44,6 +46,14 @@ const SCENARIO_LABELS: Record<string, string> = {
   'ssa2':  'SSA Level 2',
   'ssa3':  'SSA Level 3',
   'ssa4':  'SSA Level 4',
+}
+
+// Stable color per zone_type string using a simple hash.
+const ZONE_PALETTE = ['#10b981','#3b82f6','#f97316','#8b5cf6','#ef4444','#eab308','#06b6d4','#84cc16','#ec4899','#14b8a6']
+function zoneColor(type: string): string {
+  let h = 0
+  for (let i = 0; i < type.length; i++) h = (h * 31 + type.charCodeAt(i)) & 0xffff
+  return ZONE_PALETTE[h % ZONE_PALETTE.length]
 }
 
 function scenarioLabel(scenario: string | null): string {
@@ -134,12 +144,82 @@ function HazardPanel({
 // ── Zoning panel ──────────────────────────────────────────────────────────────
 
 function ZoningPanel() {
-  return (
+  const { zoningPmtileUrl, showZoning, setShowZoning } = useMapContext()
+  const { selectedCity } = useCityContext()
+  const navigate = useNavigate()
+
+  const { data, isLoading } = useListZoningAreasCitiesCityIdZoningGet(
+    selectedCity?.id ?? '',
+    { query: { enabled: !!selectedCity?.id } },
+  )
+  const zones = data?.data ?? []
+
+  // Group by zone_type for the list display
+  const grouped = zones.reduce<Record<string, number>>((acc, z) => {
+    const key = z.zone_type ?? '(unlabelled)'
+    acc[key] = (acc[key] ?? 0) + 1
+    return acc
+  }, {})
+  const zoneTypes = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
+
+  if (isLoading) return (
+    <div className="flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
+      <Loader2 className="size-3.5 animate-spin" /> Loading zones…
+    </div>
+  )
+
+  if (!zoningPmtileUrl && zones.length === 0) return (
     <div className="flex flex-1 items-center justify-center px-4 text-center">
-      <div className="space-y-1.5">
+      <div className="space-y-2.5">
         <LayoutGrid className="mx-auto size-8 text-muted-foreground/40" />
-        <p className="text-xs text-muted-foreground">No zoning data available for the selected city.</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          No zoning data for this city yet.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1.5"
+          onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}
+        >
+          <ScanText className="size-3.5" /> OCR + Georeferencing
+        </Button>
       </div>
+    </div>
+  )
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Master toggle */}
+      <div className="px-3 py-2.5 flex items-center justify-between shrink-0">
+        <span className="text-xs font-medium">Show zoning overlay</span>
+        <Switch
+          checked={showZoning}
+          onCheckedChange={setShowZoning}
+          className="scale-90"
+          disabled={!zoningPmtileUrl}
+        />
+      </div>
+
+      <Separator className="shrink-0" />
+
+      {/* Zone type list */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-3 py-2 space-y-0.5">
+          <p className="text-[10px] font-medium text-muted-foreground mb-2">
+            {zones.length} zone{zones.length !== 1 ? 's' : ''} · {zoneTypes.length} type{zoneTypes.length !== 1 ? 's' : ''}
+          </p>
+          {zoneTypes.map(([type, count]) => (
+            <div key={type} className="flex items-center gap-2 py-1.5">
+              <span
+                className="size-2.5 rounded-sm shrink-0"
+                style={{ backgroundColor: zoneColor(type) }}
+              />
+              <span className="text-xs truncate flex-1">{type}</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">{count}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
     </div>
   )
 }
@@ -147,7 +227,8 @@ function ZoningPanel() {
 // ── Root ─────────────────────────────────────────────────────────────────────
 
 export function HazardControls() {
-  const { hazardLayers, visibleHazardKeys, toggleHazard, engine } = useMapContext()
+  const { hazardLayers, visibleHazardKeys, toggleHazard, engine, zoningPmtileUrl } = useMapContext()
+  const { selectedCity } = useCityContext()
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
   const navigate = useNavigate()
 
@@ -160,6 +241,7 @@ export function HazardControls() {
     }))
 
   const hasHazards = groups.length > 0
+  const hasZoning  = !!zoningPmtileUrl || !!selectedCity?.id  // always show button when city selected
 
   function handleToggleAll(tiles: HazardTile[], showAll: boolean) {
     for (const tile of tiles) {
@@ -176,7 +258,7 @@ export function HazardControls() {
 
   const stripButtons: { id: ActivePanel; icon: LucideIcon; label: string; disabled?: boolean }[] = [
     { id: 'hazard', icon: AlertTriangle, label: 'Hazard Layers', disabled: !hasHazards },
-    { id: 'zoning', icon: LayoutGrid,   label: 'Zoning Layers' },
+    { id: 'zoning', icon: LayoutGrid,   label: 'Zoning Layers', disabled: !hasZoning  },
   ]
 
   return (

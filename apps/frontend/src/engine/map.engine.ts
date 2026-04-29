@@ -46,6 +46,10 @@ const LIGHT_PRESETS: Record<LightPreset, maplibregl.LightSpecification> = {
 const CITY_BOUND_SOURCE = 'city-boundary'
 const CITY_BOUND_LAYER  = 'city-boundary-outline'
 
+const ZONING_SOURCE = 'zoning-src'
+const ZONING_FILL   = 'zoning-fill'
+const ZONING_LINE   = 'zoning-line'
+
 // Tippecanoe source-layer names baked into each PMTile.
 // NOAH hazards: seeded from "slice.geojson" → layer = "slice".
 // Faultlines:   seeded from "faultline.geojson" → layer = "faultline".
@@ -459,6 +463,47 @@ export class MapEngine {
     return this._cityBoundary.coordinates.some(poly => this._pointInRing(lng, lat, poly[0]))
   }
 
+  // ── Zoning PMTile layer ───────────────────────────────────────────────────────
+
+  /** Load city zoning PMTile as fill + outline layers. Re-entrant — clears previous layer first. */
+  setZoningLayer(url: string, sourceLayer: string): this {
+    if (!this._map.isStyleLoaded()) {
+      this._map.once('idle', () => this.setZoningLayer(url, sourceLayer))
+      return this
+    }
+    this.clearZoningLayer()
+    this._map.addSource(ZONING_SOURCE, { type: 'vector', url: `pmtiles://${url}` })
+    const beforeId = this._map.getLayer(CITY_BOUND_LAYER) ? CITY_BOUND_LAYER : undefined
+    this._map.addLayer({
+      id: ZONING_FILL,
+      type: 'fill',
+      source: ZONING_SOURCE,
+      'source-layer': sourceLayer,
+      paint: { 'fill-color': '#10b981', 'fill-opacity': 0.28 },
+    }, beforeId)
+    this._map.addLayer({
+      id: ZONING_LINE,
+      type: 'line',
+      source: ZONING_SOURCE,
+      'source-layer': sourceLayer,
+      paint: { 'line-color': '#059669', 'line-width': 1, 'line-opacity': 0.75 },
+    }, beforeId)
+    return this
+  }
+
+  clearZoningLayer(): this {
+    this.removeLayer(ZONING_FILL)
+    this.removeLayer(ZONING_LINE)
+    this.removeSource(ZONING_SOURCE)
+    return this
+  }
+
+  setZoningLayerVisible(visible: boolean): this {
+    this.setLayerVisibility(ZONING_FILL, visible)
+    this.setLayerVisibility(ZONING_LINE, visible)
+    return this
+  }
+
   // ── Image overlays (georeferencing) ──────────────────────────────────────────
 
   /** Add a raster image overlay. corners = [TL, TR, BR, BL] in [lng, lat]. */
@@ -509,6 +554,7 @@ export class MapEngine {
     this.clearMarkers()
     this.clearPopups()
     this.clearHazardLayers()
+    this.clearZoningLayer()
     this.clearImageOverlays()
     this.clearCityBoundary()
   }
