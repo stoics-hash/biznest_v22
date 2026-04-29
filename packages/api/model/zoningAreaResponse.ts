@@ -11,6 +11,7 @@ export interface ZoningAreaResponse {
   city_id: string;
   zone_type: string | null;
   geometry: ZoningAreaResponseGeometry;
+  pmtile_url: string | null;
   created_by: string | null;
   created_at: string;
 }

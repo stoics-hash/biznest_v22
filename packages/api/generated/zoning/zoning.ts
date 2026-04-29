@@ -31,6 +31,7 @@ import type {
   ZoningAreaResponse,
   ZoningAreaUpdate,
   ZoningImageProcessRequest,
+  ZoningPmtilesResponse,
   ZoningProcessResponse
 } from '../../model';
 
@@ -245,6 +246,73 @@ export const useProcessZoningImageCitiesCityIdZoningProcessImagePost = <TError =
       return useMutation(getProcessZoningImageCitiesCityIdZoningProcessImagePostMutationOptions(options));
     }
     /**
+ * Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile.
+ * @summary Get Zoning Pmtiles
+ */
+export const getZoningPmtilesCitiesCityIdZoningPmtilesGet = (
+    cityId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<ZoningPmtilesResponse>> => {
+
+
+    return axios.default.get(
+      `/cities/${cityId}/zoning/pmtiles`,options
+    );
+  }
+
+
+
+
+export const getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey = (cityId: string,) => {
+    return [
+    `/cities/${cityId}/zoning/pmtiles`
+    ] as const;
+    }
+
+
+export const getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryOptions = <TData = Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey(cityId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>> = ({ signal }) => getZoningPmtilesCitiesCityIdZoningPmtilesGet(cityId, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryResult = NonNullable<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>>
+export type GetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary Get Zoning Pmtiles
+ */
+
+export function useGetZoningPmtilesCitiesCityIdZoningPmtilesGet<TData = Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryOptions(cityId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
  * @summary Get Zoning Area
  */
 export const getZoningAreaCitiesCityIdZoningZoneIdGet = (

@@ -67,4 +67,5 @@ export * from './zoningAreaResponseGeometry';
 export * from './zoningAreaUpdate';
 export * from './zoningAreaUpdateGeometry';
 export * from './zoningImageProcessRequest';
+export * from './zoningPmtilesResponse';
 export * from './zoningProcessResponse';
