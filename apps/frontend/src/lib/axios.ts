@@ -10,7 +10,6 @@ export const tokenManager = {
 
 Axios.defaults.baseURL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000'
 Axios.defaults.withCredentials = true
-Axios.defaults.headers.common['Content-Type'] = 'application/json'
 Axios.defaults.headers.common['Accept'] = 'application/json'
 
 Axios.interceptors.request.use(

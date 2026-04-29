@@ -248,13 +248,73 @@ def contour_to_geo_polygon(contour: np.ndarray, H: np.ndarray) -> Polygon | None
 
 
 # ---------------------------------------------------------------------------
-# PMTile generation
+# PMTile generation — native tippecanoe or WSL fallback
 # ---------------------------------------------------------------------------
+
+_TIPPECANOE_ARGS = [
+    "--force",
+    "--minimum-zoom=8",
+    "--maximum-zoom=18",
+    "--generate-ids",
+    "--no-tile-stats",
+]
+
+
+def _to_wsl_path(windows_path: str) -> str:
+    """
+    Convert a Windows absolute path to its WSL /mnt/<drive>/... equivalent.
+    C:\\Users\\foo\\bar.geojson  →  /mnt/c/Users/foo/bar.geojson
+    Already-unix paths (no drive letter) are returned unchanged.
+    Uses p.parts to avoid backslash-escaping issues on Windows.
+    """
+    p = Path(windows_path)
+    if not p.drive:
+        return windows_path
+    drive = p.drive[0].lower()          # 'C:' → 'c'
+    parts = list(p.parts[1:])           # drop drive root ('C:\\')
+    return "/mnt/" + drive + "/" + "/".join(parts)
+
+
+def _run_tippecanoe(geojson_path: str, pmtile_path: str) -> bool:
+    """
+    Try native tippecanoe first (Linux / Mac / WSL-native process).
+    On failure / not found, fall back to invoking tippecanoe inside WSL
+    from a Windows host process, converting paths to /mnt/<drive>/... format.
+    Returns True if a PMTile file was produced.
+    """
+    # 1. Native tippecanoe (Linux, Mac, or if tippecanoe is on Windows PATH)
+    try:
+        r = subprocess.run(
+            ["tippecanoe", "-o", pmtile_path, *_TIPPECANOE_ARGS, geojson_path],
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode == 0 and Path(pmtile_path).exists():
+            return True
+    except FileNotFoundError:
+        pass
+
+    # 2. WSL tippecanoe (Windows host → wsl.exe → tippecanoe inside WSL)
+    # Temp files live on a Windows path (e.g. C:\Users\...\Temp\tmpXXX\).
+    # WSL exposes Windows drives under /mnt/, so we convert the paths.
+    try:
+        wsl_geojson = _to_wsl_path(geojson_path)
+        wsl_pmtile = _to_wsl_path(pmtile_path)
+        r = subprocess.run(
+            ["wsl", "tippecanoe", "-o", wsl_pmtile, *_TIPPECANOE_ARGS, wsl_geojson],
+            capture_output=True,
+            text=True,
+        )
+        # WSL writes the file to the Windows path (same underlying location)
+        return r.returncode == 0 and Path(pmtile_path).exists()
+    except FileNotFoundError:
+        return False  # wsl.exe not on PATH or WSL not installed
+
 
 def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
     """
-    Write GeoJSON to temp file → tippecanoe → upload to MinIO.
-    Returns presigned URL (5 h TTL) or None if tippecanoe unavailable.
+    Write GeoJSON → run tippecanoe (native or via WSL) → upload PMTile to MinIO.
+    Returns a presigned MinIO URL (5 h TTL) or None when tippecanoe unavailable.
     Overwrites any existing zoning PMTile for this city.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -262,25 +322,7 @@ def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
         pmtile_path = Path(tmpdir) / "zones.pmtiles"
         geojson_path.write_text(json.dumps(geojson), encoding="utf-8")
 
-        try:
-            result = subprocess.run(
-                [
-                    "tippecanoe",
-                    "-o", str(pmtile_path),
-                    "--force",
-                    "--minimum-zoom=8",
-                    "--maximum-zoom=18",
-                    "--generate-ids",
-                    "--no-tile-stats",
-                    str(geojson_path),
-                ],
-                capture_output=True,
-                text=True,
-            )
-        except FileNotFoundError:
-            return None  # tippecanoe not installed (Windows native)
-
-        if result.returncode != 0 or not pmtile_path.exists():
+        if not _run_tippecanoe(str(geojson_path), str(pmtile_path)):
             return None
 
         object_key = f"{_ZONING_PMTILE_PREFIX}/city-{city_id}.pmtiles"

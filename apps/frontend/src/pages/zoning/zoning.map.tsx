@@ -109,6 +109,7 @@ function makeHandleEl(index: number): HTMLElement {
 function GeoRefLayer() {
   const { engine } = useMapContext()
   const geo = useGeoreference()
+  const { selectedCity } = useCityContext()
   const markersRef      = useRef<maplibregl.Marker[]>([])
   const draggingRef     = useRef(new Set<number>())
   const updateCornerRef = useRef(geo.updateCorner)
@@ -154,6 +155,7 @@ function GeoRefLayer() {
       onOpacity={geo.updateOpacity}
       onSave={geo.saveAlignment}
       onClear={geo.clearOverlay}
+      onProcess={() => geo.processImage(selectedCity?.id ?? '')}
     />
   )
 }
