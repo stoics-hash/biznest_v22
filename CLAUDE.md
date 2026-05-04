@@ -24,7 +24,7 @@ pnpm -F frontend lint
 
 # Backend (http://localhost:8000/docs)
 cd apps/backend
-docker compose up -d                        # PostgreSQL :5433 + MinIO :9000
+docker compose up -d                        # PostgreSQL :5433 + MinIO :9000/:9090
 pip install -r requirements.txt
 uvicorn main:app --reload
 
@@ -33,8 +33,10 @@ alembic revision --autogenerate -m "description"
 alembic upgrade head
 
 # API client codegen (backend must be running)
-pnpm orval
+pnpm generate:api                           # alias: pnpm orval
 ```
+
+**Alembic gotcha**: autogenerate detects and tries to drop ~30 Tiger geocoder extension tables. Always manually strip those `drop_table` calls from migration files before running `alembic upgrade head`.
 
 No test infrastructure exists yet (no pytest, no vitest).
 
@@ -74,6 +76,8 @@ On mount, it executes in sequence:
 
 `signIn()` / `register()` set cookie + dispatch `AUTH_SUCCESS`, then navigate to `/city-setup`. `register()` accepts an optional `role` param (`'investor' | 'lgu_admin'`, defaults to `'investor'`). `signOut()` clears cookie + navigates to `/login`. `refreshCities()` re-resolves city access without signing out — call after granting/revoking city access.
 
+Refresh token is stored **in-memory via ref**, never in localStorage. An Axios interceptor queues all 401 responses, calls `refreshUsersRefreshPost()`, then retries the queued requests after the refresh succeeds.
+
 ### Permission & role hooks (`src/hooks/use-permission.ts`)
 
 - `usePermission(perm: string) → boolean` — checks if current user has permission
@@ -87,11 +91,19 @@ import { PERMISSION } from '@/config/permissions'
 usePermission(PERMISSION.HAZARD_READ)
 ```
 
+The `ROLE_PERMISSIONS` map in `AuthProvider.tsx` controls frontend UI visibility only. The backend does **not** enforce permissions at the route level — do not rely on frontend permission checks for security.
+
 ### Geo contexts
 
 `CityProvider` tracks the currently selected city. Selection is persisted to `localStorage` under key `biznest:selected_city` and validated against `city_ids` from auth on restore — cleared if the city is no longer accessible or on sign-out. Consumed via `useCityContext()`.
 
-`MapProvider` holds the `MapEngine` instance, light preset, and 3D toggle state. When `selectedCity` changes, `MapProvider` fetches the city boundary and calls `engine.flyToCityBoundary()` + `engine.setCityBoundary()` automatically. Consumed via `useMapContext()`.
+`MapProvider` holds the `MapEngine` instance, light preset, 3D toggle state, and also:
+- `hazardLayers` / `visibleHazardKeys` — province hazard PMTiles + toggle visibility set
+- `zoningPmtileUrl` / `showZoning` — city zoning PMTile URL (5h TTL, null if none exists)
+
+When `selectedCity` changes, `MapProvider` fetches the city boundary and calls `engine.flyToCityBoundary()` + `engine.setCityBoundary()` automatically. On city change it also re-fetches hazard and zoning PMTile URLs. Consumed via `useMapContext()`.
+
+The hazard source-layer name is discovered at runtime by reading each PMTile's TileJSON metadata — it is not always `slice` (tippecanoe outputs vary). The hardcoded fallback names are: NOAH hazard tiles → `slice`, faultlines → `faultline`.
 
 ### MapEngine (`src/engine/map.engine.ts`)
 
@@ -105,8 +117,6 @@ Key patterns:
 - `isInsideBoundary(lng, lat)` — point-in-polygon check using ray-casting (returns `true` when no boundary set)
 - `setTerrain(enabled)` — adds MapTiler DEM source and enables 3D terrain; requires `VITE_MAPTILER_KEY`
 - `addImageOverlay(id, url, corners)` / `updateImageOverlay(id, corners)` / `removeImageOverlay(id)` — raster image overlaid on the map using `ImageCorners` (4 `[lng, lat]` pairs: top-left, top-right, bottom-right, bottom-left)
-
-Hardcoded PMTile source-layer names: NOAH hazard tiles use `slice`, faultlines use `faultline`.
 
 ### ZoningMap — own MapLibre instance
 
@@ -140,17 +150,38 @@ shadcn/ui (radix-nova style) in `src/components/ui/`. Path alias `@` → `src/`.
 
 ## API client codegen
 
-`orval.config.js` pulls from `http://localhost:8000/openapi.json`. Outputs React Query hooks split by OpenAPI tag into `packages/api/generated/<tag>/`, TypeScript schemas into `packages/api/model/`. No build step — TypeScript exported directly. Run `pnpm orval` after any backend route/schema change.
+`orval.config.js` pulls from `http://localhost:8000/openapi.json`. Outputs React Query hooks split by OpenAPI tag into `packages/api/generated/<tag>/`, TypeScript schemas into `packages/api/model/`. No build step — TypeScript exported directly. Run `pnpm generate:api` after any backend route/schema change.
 
 ## Frontend ENV vars
 
 | Var | Required | Purpose |
 |-----|----------|---------|
+| `VITE_API_URL` | yes | Backend base URL (default: `http://127.0.0.1:8000`) |
 | `VITE_MAPTILER_KEY` | yes | MapTiler API key for terrain DEM tiles (3D terrain) |
+| `VITE_MAPBOX_TOKEN` | yes | MapBox GL token |
+| `VITE_LGU_REGISTER_TOKEN` | yes | Static token for LGU self-registration endpoint |
+
+## Backend ENV vars
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `DATABASE_URL` | — | `postgresql+pg8000://user:pass@localhost:5433/fastapi` |
+| `SECRET_KEY` | — | JWT signing key (required) |
+| `ALGORITHM` | `HS256` | JWT algorithm |
+| `JWT_COOKIE_NAME` | `ACCESS_TOKEN` | Cookie name for JWT |
+| `SECURE_COOKIES` | `false` | Set `true` in production (HTTPS only) |
+| `ACCESS_TOKEN_EXPIRE_SECONDS` | `900` | 15 min |
+| `REFRESH_TOKEN_EXPIRE_SECONDS` | `604800` | 7 days |
+| `FRONTEND_URL` | `http://localhost:3001` | CORS origin + LGU invite magic-link base URL |
+| `LGU_INVITE_EXPIRE_HOURS` | `24` | Magic-link TTL |
+| `SMTP_HOST/PORT/USER/PASSWORD/FROM` | — | Email (silently disabled if unset) |
+| `HUGGING_FACE_TOKEN` | — | Seed scripts only (NOAH hazard downloads) |
+
+Docker Compose services: PostgreSQL on port `5433` (host) → `5432` (container), MinIO on `9000` (S3 API) and `9090` (console). MinIO credentials: `minio` / `minio123`. The `uploads` bucket is auto-created on startup.
 
 ## Backend summary
 
-See `apps/backend/CLAUDE.md` for full architecture. Non-obvious points for frontend work:
+See `apps/backend/CLAUDE.md` for full architecture. Non-obvious points:
 
 - `HazardArea` is province-scoped (NOAH data); routes are under `/provinces/{province_id}/hazards/*` — pass `province_id` directly, no city-level hazard filtering
 - Hazard PMTile URLs are presigned MinIO URLs with **5-hour TTL** — frontend must re-fetch when expired; do not cache them indefinitely
@@ -158,3 +189,8 @@ See `apps/backend/CLAUDE.md` for full architecture. Non-obvious points for front
 - Route endpoints return `HazardAreaSummary` (no geometry) — geometry lives only in PMTiles
 - `get_db` session generator lives in `utils/jwtUtils.py`, not `core/db.py`
 - `tippecanoe` (PMTile generation) only runs on Linux/Mac/WSL — use `--skip-pmtiles` flag on Windows when seeding
+- `SessionLocal` is configured with `expire_on_commit=False` — ORM objects remain readable after commit without an explicit refresh
+- `AuditLog` has **no FK** on `user_id` / `city_id` by design — records survive entity deletion
+- New user registration auto-enrolls the user into the `free` subscription plan in the same DB transaction as role assignment
+- **LGU invite flow**: superuser POST `/users/lgu/invite` → 24h magic-link token → user GET `/users/lgu/verify-invitation?token=` → POST `/users/lgu/register` → auto-assigned `lgu_admin` role. Duplicate pending invites are blocked at the service layer.
+- Backend does **not** enforce permissions at the route level — all 13 seeded permissions exist for frontend UI gating only
