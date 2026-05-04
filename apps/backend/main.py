@@ -30,11 +30,13 @@ Base.metadata.create_all(bind=engine)
 with SessionLocal() as db:
     seed(db)
 
+print("RUNNING MAIN FILE:  ", __file__)
+
 app = FastAPI(title="BizNest Geo-Intelligence API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001"],
+    allow_origins=["http://127.0.0.1:3001", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

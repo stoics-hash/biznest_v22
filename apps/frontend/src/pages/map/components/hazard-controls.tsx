@@ -1,14 +1,26 @@
-import { useState } from 'react'
-import { Waves, Mountain, CloudLightning, Zap, Layers, X } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, Waves, Mountain, CloudLightning, Zap, Layers, X, Plus, Upload, PenLine, Plug, ScanText, Loader2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
+import { useCityContext } from '@/context/city.context'
 import type { HazardTile } from '@/engine/map.engine'
+import { useListZoningAreasCitiesCityIdZoningGet } from '@networking/api/generated/zoning/zoning'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -16,15 +28,14 @@ interface HazardMeta {
   label: string
   icon: LucideIcon
   iconColor: string
-  activeRing: string
 }
 
 const HAZARD_META: Record<string, HazardMeta> = {
-  flood:       { label: 'Flood',        icon: Waves,          iconColor: 'text-blue-400',   activeRing: 'ring-blue-400/50'   },
-  landslide:   { label: 'Landslide',    icon: Mountain,       iconColor: 'text-orange-400', activeRing: 'ring-orange-400/50' },
-  storm_surge: { label: 'Storm Surge',  icon: CloudLightning, iconColor: 'text-purple-400', activeRing: 'ring-purple-400/50' },
-  debris_flow: { label: 'Debris Flow',  icon: Layers,         iconColor: 'text-amber-500',  activeRing: 'ring-amber-500/50'  },
-  faultline:   { label: 'Faultline',    icon: Zap,            iconColor: 'text-red-400',    activeRing: 'ring-red-400/50'    },
+  flood:       { label: 'Flood',       icon: Waves,          iconColor: 'text-blue-400'   },
+  landslide:   { label: 'Landslide',   icon: Mountain,       iconColor: 'text-orange-400' },
+  storm_surge: { label: 'Storm Surge', icon: CloudLightning, iconColor: 'text-purple-400' },
+  debris_flow: { label: 'Debris Flow', icon: Layers,         iconColor: 'text-amber-500'  },
+  faultline:   { label: 'Faultline',   icon: Zap,            iconColor: 'text-red-400'    },
 }
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -37,123 +48,331 @@ const SCENARIO_LABELS: Record<string, string> = {
   'ssa4':  'SSA Level 4',
 }
 
+// Stable color per zone_type string using a simple hash.
+const ZONE_PALETTE = ['#10b981','#3b82f6','#f97316','#8b5cf6','#ef4444','#eab308','#06b6d4','#84cc16','#ec4899','#14b8a6']
+function zoneColor(type: string): string {
+  let h = 0
+  for (let i = 0; i < type.length; i++) h = (h * 31 + type.charCodeAt(i)) & 0xffff
+  return ZONE_PALETTE[h % ZONE_PALETTE.length]
+}
+
 function scenarioLabel(scenario: string | null): string {
   if (!scenario) return 'All Features'
   return SCENARIO_LABELS[scenario] ?? scenario.toUpperCase()
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+type ActivePanel = 'hazard' | 'zoning' | null
 
-export function HazardControls() {
-  const { hazardLayers, visibleHazardKeys, toggleHazard, engine } = useMapContext()
-  const [activeType, setActiveType] = useState<string | null>(null)
+// ── Hazard panel ──────────────────────────────────────────────────────────────
 
-  // Group tiles by hazard_type, in HAZARD_META display order
-  const groups = hazardLayers.reduce<Record<string, HazardTile[]>>((acc, tile) => {
-    ;(acc[tile.hazard_type] ??= []).push(tile)
+interface HazardGroup {
+  type: string
+  meta: HazardMeta
+  tiles: HazardTile[]
+}
+
+function HazardPanel({
+  groups,
+  visibleHazardKeys,
+  toggleHazard,
+  onToggleAll,
+}: {
+  groups: HazardGroup[]
+  visibleHazardKeys: Set<string>
+  toggleHazard: (key: string) => void
+  onToggleAll: (tiles: HazardTile[], showAll: boolean) => void
+}) {
+  return (
+    <ScrollArea className="flex-1 min-h-0">
+      <div className="px-3 pb-3 space-y-1">
+        {groups.map((group, gi) => {
+          const Icon = group.meta.icon
+          const keys = group.tiles.map(t => `${t.hazard_type}::${t.scenario ?? 'all'}`)
+          const allOn = keys.every(k => visibleHazardKeys.has(k))
+          const someOn = keys.some(k => visibleHazardKeys.has(k))
+
+          return (
+            <div key={group.type}>
+              {gi > 0 && <Separator className="mb-1" />}
+
+              {/* Type header row */}
+              <div className="flex items-center justify-between py-2 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon className={cn('size-4 shrink-0', group.meta.iconColor)} />
+                  <span className="text-xs font-semibold truncate">{group.meta.label}</span>
+                </div>
+                <Switch
+                  checked={allOn}
+                  data-state={someOn && !allOn ? 'indeterminate' : undefined}
+                  onCheckedChange={checked => onToggleAll(group.tiles, checked)}
+                  className="shrink-0 scale-90 bg-amber-300"
+                />
+              </div>
+
+              {/* Scenario sub-rows */}
+              {group.tiles.length > 1 && (
+                <div className="ml-6 space-y-0">
+                  {group.tiles.map((tile, ti) => {
+                    const key = `${tile.hazard_type}::${tile.scenario ?? 'all'}`
+                    const visible = visibleHazardKeys.has(key)
+                    return (
+                      <div key={key}>
+                        {ti > 0 && <Separator className="my-0 opacity-40" />}
+                        <div className="flex items-center justify-between py-2 gap-3">
+                          <span className="text-[11px] text-muted-foreground leading-tight">
+                            {scenarioLabel(tile.scenario)}
+                          </span>
+                          <Switch
+                            checked={visible}
+                            onCheckedChange={() => toggleHazard(key)}
+                            className="shrink-0 scale-75"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </ScrollArea>
+  )
+}
+
+// ── Zoning panel ──────────────────────────────────────────────────────────────
+
+function ZoningPanel() {
+  const { zoningPmtileUrl, showZoning, setShowZoning } = useMapContext()
+  const { selectedCity } = useCityContext()
+  const navigate = useNavigate()
+
+  const { data, isLoading } = useListZoningAreasCitiesCityIdZoningGet(
+    selectedCity?.id ?? '',
+    { query: { enabled: !!selectedCity?.id } },
+  )
+  const zones = data?.data ?? []
+
+  // Group by zone_type for the list display
+  const grouped = zones.reduce<Record<string, number>>((acc, z) => {
+    const key = z.zone_type ?? '(unlabelled)'
+    acc[key] = (acc[key] ?? 0) + 1
     return acc
   }, {})
+  const zoneTypes = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
 
-  const orderedTypes = Object.keys(HAZARD_META).filter(t => t in groups)
+  if (isLoading) return (
+    <div className="flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
+      <Loader2 className="size-3.5 animate-spin" /> Loading zones…
+    </div>
+  )
 
-  if (orderedTypes.length === 0) return null
-
-  const activeMeta  = activeType ? HAZARD_META[activeType] : null
-  const activeTiles = activeType ? (groups[activeType] ?? []) : []
-
-  function handleIconClick(type: string) {
-    setActiveType(prev => (prev === type ? null : type))
-  }
+  if (!zoningPmtileUrl && zones.length === 0) return (
+    <div className="flex flex-1 items-center justify-center px-4 text-center">
+      <div className="space-y-2.5">
+        <LayoutGrid className="mx-auto size-8 text-muted-foreground/40" />
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          No zoning data for this city yet.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1.5"
+          onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}
+        >
+          <ScanText className="size-3.5" /> OCR + Georeferencing
+        </Button>
+      </div>
+    </div>
+  )
 
   return (
-    // Outer container: centered vertically on the right edge, above MapLibre controls
-    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10 pointer-events-none">
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Master toggle */}
+      <div className="px-3 py-2.5 flex items-center justify-between shrink-0">
+        <span className="text-xs font-medium">Show zoning overlay</span>
+        <Switch
+          checked={showZoning}
+          onCheckedChange={setShowZoning}
+          className="scale-90"
+          disabled={!zoningPmtileUrl}
+        />
+      </div>
 
-      {/* ── Scenario panel ─────────────────────────────────────────────────── */}
-      {activeType && activeMeta && activeTiles.length > 0 && (
-        <Card className="pointer-events-auto w-56 shadow-2xl bg-background/95 backdrop-blur-md border-border/50 animate-in fade-in-0 slide-in-from-right-2 duration-150">
-          <CardHeader className="pb-0 pt-3 px-3">
+      <Separator className="shrink-0" />
+
+      {/* Zone type list */}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-3 py-2 space-y-0.5">
+          <p className="text-[10px] font-medium text-muted-foreground mb-2">
+            {zones.length} zone{zones.length !== 1 ? 's' : ''} · {zoneTypes.length} type{zoneTypes.length !== 1 ? 's' : ''}
+          </p>
+          {zoneTypes.map(([type, count]) => (
+            <div key={type} className="flex items-center gap-2 py-1.5">
+              <span
+                className="size-2.5 rounded-sm shrink-0"
+                style={{ backgroundColor: zoneColor(type) }}
+              />
+              <span className="text-xs truncate flex-1">{type}</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">{count}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+}
+
+// ── Root ─────────────────────────────────────────────────────────────────────
+
+export function HazardControls() {
+  const { hazardLayers, visibleHazardKeys, toggleHazard, engine, zoningPmtileUrl } = useMapContext()
+  const { selectedCity } = useCityContext()
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null)
+  const navigate = useNavigate()
+
+  const groups: HazardGroup[] = Object.entries(HAZARD_META)
+    .filter(([type]) => hazardLayers.some(t => t.hazard_type === type))
+    .map(([type, meta]) => ({
+      type,
+      meta,
+      tiles: hazardLayers.filter(t => t.hazard_type === type),
+    }))
+
+  const hasHazards = groups.length > 0
+  const hasZoning  = !!zoningPmtileUrl || !!selectedCity?.id  // always show button when city selected
+
+  function handleToggleAll(tiles: HazardTile[], showAll: boolean) {
+    for (const tile of tiles) {
+      const key = engine?.hazardKey(tile) ?? `${tile.hazard_type}::${tile.scenario ?? 'all'}`
+      const visible = visibleHazardKeys.has(key)
+      if (showAll && !visible) toggleHazard(key)
+      else if (!showAll && visible) toggleHazard(key)
+    }
+  }
+
+  function togglePanel(panel: ActivePanel) {
+    setActivePanel(prev => (prev === panel ? null : panel))
+  }
+
+  const stripButtons: { id: ActivePanel; icon: LucideIcon; label: string; disabled?: boolean }[] = [
+    { id: 'hazard', icon: AlertTriangle, label: 'Hazard Layers', disabled: !hasHazards },
+    { id: 'zoning', icon: LayoutGrid,   label: 'Zoning Layers', disabled: !hasZoning  },
+  ]
+
+  return (
+    <div className="absolute right-3 top-3 bottom-3 flex items-start gap-2 z-10 pointer-events-none">
+
+      {/* ── Expanded side panel ──────────────────────────────────────────── */}
+      {activePanel && (
+        <Card className="pointer-events-auto flex flex-col w-60 h-full shadow-2xl bg-background/95 backdrop-blur-md border-border/50 animate-in fade-in-0 slide-in-from-right-2 duration-150">
+          <CardHeader className="pb-0 pt-3 px-3 shrink-0">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <activeMeta.icon className={cn('size-4 shrink-0', activeMeta.iconColor)} />
-                {activeMeta.label}
+              <CardTitle className="text-sm font-semibold">
+                {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 text-muted-foreground hover:text-foreground -mr-1"
-                onClick={() => setActiveType(null)}
-              >
-                <X className="size-3.5" />
-              </Button>
+              <div className="flex items-center gap-0.5 -mr-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
+                      <Plus className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" side="bottom" className="w-52">
+                    {activePanel === 'hazard' ? (
+                      <>
+                        <DropdownMenuLabel className="text-xs">Add Hazard Data</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Upload className="size-4" />
+                          Upload file
+                          <span className="ml-auto text-[10px] text-muted-foreground">GeoJSON / ZIP</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <PenLine className="size-4" />
+                          Manual entry
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Plug className="size-4" />
+                          Through API
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuLabel className="text-xs">Add Zoning Data</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}>
+                          <ScanText className="size-4" />
+                          OCR + Georeferencing
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <PenLine className="size-4" />
+                          Manual entry
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => setActivePanel(null)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
 
-          <Separator className="mt-2" />
+          <Separator className="mt-2 shrink-0" />
 
-          <CardContent className="px-3 py-3 space-y-0">
-            {activeTiles.map((tile, i) => {
-              const key     = engine?.hazardKey(tile) ?? ''
-              const visible = visibleHazardKeys.has(key)
-              return (
-                <div key={key}>
-                  {i > 0 && <Separator className="my-0" />}
-                  <div className="flex items-center justify-between py-2.5 gap-3">
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-xs font-medium leading-tight truncate">
-                        {scenarioLabel(tile.scenario)}
-                      </span>
-                      {tile.scenario && (
-                        <span className="text-[10px] text-muted-foreground leading-tight">
-                          Return period
-                        </span>
-                      )}
-                    </div>
-                    <Switch
-                      checked={visible}
-                      onCheckedChange={() => toggleHazard(key)}
-                      className="shrink-0"
-                    />
-                  </div>
-                </div>
-              )
-            })}
+          <CardContent className="flex flex-col flex-1 min-h-0 p-0">
+            {activePanel === 'hazard' ? (
+              <HazardPanel
+                groups={groups}
+                visibleHazardKeys={visibleHazardKeys}
+                toggleHazard={toggleHazard}
+                onToggleAll={handleToggleAll}
+              />
+            ) : (
+              <ZoningPanel />
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* ── Icon strip ─────────────────────────────────────────────────────── */}
+      {/* ── Icon strip ───────────────────────────────────────────────────── */}
       <TooltipProvider delayDuration={400}>
-        <div className="pointer-events-auto flex flex-col gap-0.5 rounded-xl bg-black/65 backdrop-blur-md shadow-2xl p-1.5 border border-white/10">
-          {orderedTypes.map((type, i) => {
-            const meta     = HAZARD_META[type]!
-            const Icon     = meta.icon
-            const isActive = activeType === type
-
+        <div className="pointer-events-auto self-center flex flex-col gap-0.5 rounded-xl bg-black/65 backdrop-blur-md shadow-2xl p-1.5 border border-white/10">
+          {stripButtons.map((btn, i) => {
+            const Icon = btn.icon
+            const isActive = activePanel === btn.id
             return (
-              <div key={type}>
+              <div key={btn.id}>
                 {i > 0 && <Separator className="my-0.5 bg-white/10" />}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={meta.label}
-                      onClick={() => handleIconClick(type)}
+                      aria-label={btn.label}
+                      disabled={btn.disabled}
+                      onClick={() => togglePanel(btn.id)}
                       className={cn(
                         'size-9 rounded-lg transition-all',
                         'hover:bg-white/15 text-white/60 hover:text-white',
-                        isActive && cn(
-                          'bg-white/20 text-white ring-1',
-                          meta.activeRing,
-                        ),
+                        'disabled:opacity-30 disabled:pointer-events-none',
+                        isActive && 'bg-white/20 text-white ring-1 ring-white/30',
                       )}
                     >
-                      <Icon className={cn('size-5', meta.iconColor)} />
+                      <Icon className="size-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left" sideOffset={8}>
-                    {meta.label}
+                    {btn.disabled ? `${btn.label} — no data` : btn.label}
                   </TooltipContent>
                 </Tooltip>
               </div>

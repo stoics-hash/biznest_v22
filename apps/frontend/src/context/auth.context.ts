@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { UserResponse } from '@networking/api/model/userResponse'
+import type { CityResponse } from '@networking/api/model/cityResponse'
 
 export type AuthAction =
   | { type: 'RESTORE_START' }
@@ -9,6 +10,7 @@ export type AuthAction =
       role_name: string | null
       permissions: string[]
       city_ids: string[]
+      lgu_city?: CityResponse
     }
   | { type: 'UNAUTHENTICATED' }
   | { type: 'SIGN_OUT' }
@@ -22,6 +24,7 @@ export type AuthState =
       role_name: string | null
       permissions: string[]
       city_ids: string[]
+      lgu_city?: CityResponse
     }
   | { state: 'UNAUTHENTICATED' }
   | { state: 'SIGNING_OUT' }

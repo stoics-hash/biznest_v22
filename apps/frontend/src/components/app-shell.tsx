@@ -147,7 +147,8 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
 }
 
 const FULLSCREEN_PATHS = ['/city-setup']
-const MAP_PATHS = ['/map']
+const MAP_PATHS = ['/map', '/zoning']
+const FULLSCREEN_MAP_PATHS = ['/zoning/zoning-map']
 
 export function AppShell() {
   const { state, signOut } = useAuthContext()
@@ -160,6 +161,7 @@ export function AppShell() {
   }
 
   const isMapPath = MAP_PATHS.some(p => location.pathname.startsWith(p))
+  const isFullscreenMap = FULLSCREEN_MAP_PATHS.some(p => location.pathname.startsWith(p))
   const { user, role_name, city_ids } = state
 
   const baseSections =
@@ -235,12 +237,14 @@ export function AppShell() {
           <SidebarRail />
         </Sidebar>
 
-        <SidebarInset className={isMapPath ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mx-1 h-4" />
-          </header>
-          {isMapPath ? (
+        <SidebarInset className={(isMapPath || isFullscreenMap) ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}>
+          {!isFullscreenMap && (
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mx-1 h-4" />
+            </header>
+          )}
+          {(isMapPath || isFullscreenMap) ? (
             <div className="flex-1 overflow-hidden relative">
               <Outlet />
             </div>

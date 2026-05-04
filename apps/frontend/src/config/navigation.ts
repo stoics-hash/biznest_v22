@@ -1,16 +1,16 @@
-import type { LucideIcon } from 'lucide-react'
+import type {LucideIcon} from 'lucide-react'
 import {
-  LayoutDashboard,
-  Map,
+  Bell,
+  Bookmark,
   Building2,
   CreditCard,
-  Bookmark,
-  Bell,
   Database,
+  LayoutDashboard,
+  Map,
   ScrollText,
   Settings,
-  Users,
   ShieldCheck,
+  Users
 } from 'lucide-react'
 
 export type NavItem = {

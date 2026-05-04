@@ -17,8 +17,17 @@ function readStoredCity(): CityResponse | null {
 export function CityProvider({ children }: PropsWithChildren) {
   const { state } = useAuthContext()
   const cityIds = state.state === 'AUTHENTICATED' ? state.city_ids : []
+  const lguCity = state.state === 'AUTHENTICATED' ? state.lgu_city : undefined
 
   const [selectedCity, setSelectedCity] = useState<CityResponse | null>(readStoredCity)
+
+  // Auto-select the LGU admin's assigned city on login (one city per lgu_admin)
+  useEffect(() => {
+    if (lguCity && !selectedCity) {
+      setSelectedCity(lguCity)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(lguCity))
+    }
+  }, [lguCity])
 
   // If the persisted city is no longer in the user's accessible set, clear it
   useEffect(() => {

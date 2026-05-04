@@ -26,6 +26,7 @@ import type {
 } from 'axios';
 
 import type {
+  CityResponse,
   HTTPValidationError,
   LguAssignmentCreate,
   LguAssignmentResponse
@@ -290,3 +291,69 @@ export const useDeleteAssignmentLguAssignmentsAssignmentIdDelete = <TError = Axi
       > => {
       return useMutation(getDeleteAssignmentLguAssignmentsAssignmentIdDeleteMutationOptions(options));
     }
+    /**
+ * @summary Get City By User
+ */
+export const getCityByUserLguAssignmentsUserUserIdCityGet = (
+    userId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<CityResponse>> => {
+
+
+    return axios.default.get(
+      `/lgu-assignments/user/${userId}/city`,options
+    );
+  }
+
+
+
+
+export const getGetCityByUserLguAssignmentsUserUserIdCityGetQueryKey = (userId: string,) => {
+    return [
+    `/lgu-assignments/user/${userId}/city`
+    ] as const;
+    }
+
+
+export const getGetCityByUserLguAssignmentsUserUserIdCityGetQueryOptions = <TData = Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>, TError = AxiosError<HTTPValidationError>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCityByUserLguAssignmentsUserUserIdCityGetQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>> = ({ signal }) => getCityByUserLguAssignmentsUserUserIdCityGet(userId, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(userId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCityByUserLguAssignmentsUserUserIdCityGetQueryResult = NonNullable<Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>>
+export type GetCityByUserLguAssignmentsUserUserIdCityGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary Get City By User
+ */
+
+export function useGetCityByUserLguAssignmentsUserUserIdCityGet<TData = Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>, TError = AxiosError<HTTPValidationError>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCityByUserLguAssignmentsUserUserIdCityGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCityByUserLguAssignmentsUserUserIdCityGetQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+

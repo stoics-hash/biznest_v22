@@ -16,6 +16,10 @@ export interface MapData {
   visibleHazardKeys: Set<string>
   /** Toggle a single hazard layer on or off by its key. */
   toggleHazard: (key: string) => void
+  /** Presigned MinIO URL for the city zoning PMTile (5-hour TTL). Null = no zoning data. */
+  zoningPmtileUrl: string | null
+  showZoning: boolean
+  setShowZoning: (v: boolean) => void
 }
 
 export const MapContext = createContext<MapData>({
@@ -28,6 +32,9 @@ export const MapContext = createContext<MapData>({
   hazardLayers: [],
   visibleHazardKeys: new Set(),
   toggleHazard: () => {},
+  zoningPmtileUrl: null,
+  showZoning: true,
+  setShowZoning: () => {},
 })
 
 export const useMapContext = () => useContext(MapContext)

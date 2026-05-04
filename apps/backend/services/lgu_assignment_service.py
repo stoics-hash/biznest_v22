@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from dto.LguAssignmentDto import LguAssignmentCreate
+from models.city import City
 from models.lgu_assignment import LguAssignment
 
 
@@ -16,6 +17,13 @@ def get_or_404(assignment_id: UUID, db: Session) -> LguAssignment:
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     return assignment
+
+
+def get_city_by_user(user_id: UUID, db: Session) -> City:
+    assignment = db.query(LguAssignment).filter(LguAssignment.user_id == user_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="No assignment found for user")
+    return assignment.city
 
 
 def create(payload: LguAssignmentCreate, db: Session) -> LguAssignment:

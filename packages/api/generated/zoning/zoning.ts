@@ -29,7 +29,10 @@ import type {
   HTTPValidationError,
   ZoningAreaCreate,
   ZoningAreaResponse,
-  ZoningAreaUpdate
+  ZoningAreaUpdate,
+  ZoningImageProcessRequest,
+  ZoningPmtilesResponse,
+  ZoningProcessResponse
 } from '../../model';
 
 
@@ -168,6 +171,148 @@ export const useCreateZoningAreaCitiesCityIdZoningPost = <TError = AxiosError<HT
       return useMutation(getCreateZoningAreaCitiesCityIdZoningPostMutationOptions(options));
     }
     /**
+ * Analyze an uploaded zoning map image and extract zone polygons.
+
+Pipeline:
+1. Load image from MinIO by file_id (upload via POST /files/upload first)
+2. Compute pixel→geo homography from 4+ ground control points
+3. K-means color segmentation to identify zone regions
+4. OpenCV contour detection + Douglas-Peucker approximation
+5. Google Vision OCR to extract zone labels
+6. Transform pixel contours to geographic polygons (GeoJSON)
+7. Persist ZoningArea records; regenerate city PMTile for MapLibre
+
+gcps: list of ≥4 objects mapping pixel corners to geographic coordinates.
+n_colors: number of K-means color clusters (default 8).
+min_area_px: minimum contour area in pixels to keep (default 500).
+ * @summary Process Zoning Image
+ */
+export const processZoningImageCitiesCityIdZoningProcessImagePost = (
+    cityId: string,
+    zoningImageProcessRequest: ZoningImageProcessRequest, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<ZoningProcessResponse>> => {
+
+
+    return axios.default.post(
+      `/cities/${cityId}/zoning/process-image`,
+      zoningImageProcessRequest,options
+    );
+  }
+
+
+
+export const getProcessZoningImageCitiesCityIdZoningProcessImagePostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processZoningImageCitiesCityIdZoningProcessImagePost>>, TError,{cityId: string;data: ZoningImageProcessRequest}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof processZoningImageCitiesCityIdZoningProcessImagePost>>, TError,{cityId: string;data: ZoningImageProcessRequest}, TContext> => {
+
+const mutationKey = ['processZoningImageCitiesCityIdZoningProcessImagePost'];
+const {mutation: mutationOptions, axios: axiosOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, axios: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof processZoningImageCitiesCityIdZoningProcessImagePost>>, {cityId: string;data: ZoningImageProcessRequest}> = (props) => {
+          const {cityId,data} = props ?? {};
+
+          return  processZoningImageCitiesCityIdZoningProcessImagePost(cityId,data,axiosOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ProcessZoningImageCitiesCityIdZoningProcessImagePostMutationResult = NonNullable<Awaited<ReturnType<typeof processZoningImageCitiesCityIdZoningProcessImagePost>>>
+    export type ProcessZoningImageCitiesCityIdZoningProcessImagePostMutationBody = ZoningImageProcessRequest
+    export type ProcessZoningImageCitiesCityIdZoningProcessImagePostMutationError = AxiosError<HTTPValidationError>
+
+    /**
+ * @summary Process Zoning Image
+ */
+export const useProcessZoningImageCitiesCityIdZoningProcessImagePost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processZoningImageCitiesCityIdZoningProcessImagePost>>, TError,{cityId: string;data: ZoningImageProcessRequest}, TContext>, axios?: AxiosRequestConfig}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof processZoningImageCitiesCityIdZoningProcessImagePost>>,
+        TError,
+        {cityId: string;data: ZoningImageProcessRequest},
+        TContext
+      > => {
+      return useMutation(getProcessZoningImageCitiesCityIdZoningProcessImagePostMutationOptions(options));
+    }
+    /**
+ * Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile.
+ * @summary Get Zoning Pmtiles
+ */
+export const getZoningPmtilesCitiesCityIdZoningPmtilesGet = (
+    cityId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<ZoningPmtilesResponse>> => {
+
+
+    return axios.default.get(
+      `/cities/${cityId}/zoning/pmtiles`,options
+    );
+  }
+
+
+
+
+export const getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey = (cityId: string,) => {
+    return [
+    `/cities/${cityId}/zoning/pmtiles`
+    ] as const;
+    }
+
+
+export const getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryOptions = <TData = Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey(cityId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>> = ({ signal }) => getZoningPmtilesCitiesCityIdZoningPmtilesGet(cityId, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryResult = NonNullable<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>>
+export type GetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary Get Zoning Pmtiles
+ */
+
+export function useGetZoningPmtilesCitiesCityIdZoningPmtilesGet<TData = Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningPmtilesCitiesCityIdZoningPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryOptions(cityId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
  * @summary Get Zoning Area
  */
 export const getZoningAreaCitiesCityIdZoningZoneIdGet = (

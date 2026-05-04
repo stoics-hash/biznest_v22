@@ -1,8 +1,17 @@
 import { useState } from 'react'
+import { MailPlus, MoreHorizontal } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { UserTable } from './components/user-table'
 import { UserRoleDialog } from './components/user-role-dialog'
+import { LguInviteDialog } from './components/lgu-invite-dialog'
 import { useUserManagement } from './composables/use-user-management'
 import type { UserResponse } from '@networking/api/model'
 
@@ -10,6 +19,7 @@ export function UserManagementPage() {
   const { users, roles, loading, assignRole, revokeRole, assigning, revoking } =
     useUserManagement()
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   if (loading) {
     return (
@@ -22,11 +32,28 @@ export function UserManagementPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">User Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View all users and manage their roles
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">User Management</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View all users and manage their roles
+          </p>
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <MoreHorizontal className="size-4" />
+              Actions
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setInviteOpen(true)}>
+              <MailPlus className="size-4" />
+              Send LGU magic link
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Card>
@@ -45,6 +72,8 @@ export function UserManagementPage() {
         assigning={assigning}
         revoking={revoking}
       />
+
+      <LguInviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   )
 }
