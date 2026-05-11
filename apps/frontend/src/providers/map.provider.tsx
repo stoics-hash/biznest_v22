@@ -220,7 +220,8 @@ export function MapProvider({ children }: PropsWithChildren) {
     return () => { engine.teardownZoneClickHandler() }
   }, [engine])
 
-  const refreshZoningLayer = useCallback(async (url: string) => {
+  const refreshZoningLayer = useCallback(async (url: string | null) => {
+    if (!url) { setZoningTile(null); return }
     const sl = await discoverSourceLayer(url)
     setZoningTile({ url, sourceLayer: sl ?? 'zoning' })
   }, [])

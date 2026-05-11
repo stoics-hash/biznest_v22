@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from dto.ZoningAreaDto import (
@@ -99,13 +99,23 @@ def update_zoning_area(
     return zoning_area_service.update(zone_id, city_id, payload, db)
 
 
-@router.delete("/{city_id}/zoning/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{city_id}/zoning/{zone_id}", response_model=ZoningPmtilesResponse | None)
 def delete_zoning_area(
     city_id: UUID,
     zone_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_authenticated_user),
 ):
+    """
+    Delete a zone and regenerate the city's PMTile from remaining zones.
+    Returns the new presigned PMTile URL, or null if no zones remain.
+    """
     zoning_area_service.delete(zone_id, city_id, db)
+    try:
+        return zoning_area_service.regenerate_pmtile(city_id, db)
+    except HTTPException as exc:
+        if exc.status_code == 404:  # no zones left — nothing to tile
+            return None
+        raise
 
 

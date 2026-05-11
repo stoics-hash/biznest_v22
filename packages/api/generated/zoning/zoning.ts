@@ -507,12 +507,14 @@ export const useUpdateZoningAreaCitiesCityIdZoningZoneIdPatch = <TError = AxiosE
       return useMutation(getUpdateZoningAreaCitiesCityIdZoningZoneIdPatchMutationOptions(options));
     }
     /**
+ * Delete a zone and regenerate the city's PMTile from remaining zones.
+Returns the new presigned PMTile URL, or null if no zones remain.
  * @summary Delete Zoning Area
  */
 export const deleteZoningAreaCitiesCityIdZoningZoneIdDelete = (
     cityId: string,
     zoneId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<void>> => {
+ ): Promise<AxiosResponse<ZoningPmtilesResponse | null>> => {
 
 
     return axios.default.delete(

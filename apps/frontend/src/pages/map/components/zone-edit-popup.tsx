@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, Loader2, X, PenLine } from 'lucide-react'
+import { Check, Loader2, X, PenLine, Trash2, AlertTriangle } from 'lucide-react'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
 import {
   useUpdateZoningAreaCitiesCityIdZoningZoneIdPatch,
+  useDeleteZoningAreaCitiesCityIdZoningZoneIdDelete,
   useRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost,
   getListZoningAreasCitiesCityIdZoningGetQueryKey,
   getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey,
 } from '@networking/api/generated/zoning/zoning'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+
+type View = 'edit' | 'confirm-delete'
 
 export function ZoneEditPopup() {
   const { engine, clickedZone, setClickedZone, refreshZoningLayer } = useMapContext()
@@ -20,13 +24,15 @@ export function ZoneEditPopup() {
   const [label, setLabel] = useState('')
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<View>('edit')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Sync label + focus when a new zone is selected
+  // Reset state when a new zone is selected
   useEffect(() => {
     if (!clickedZone) { setError(null); return }
     setLabel(clickedZone.zoneType)
     setError(null)
+    setView('edit')
     setTimeout(() => inputRef.current?.select(), 50)
   }, [clickedZone?.id])
 
@@ -49,10 +55,16 @@ export function ZoneEditPopup() {
   }, [engine, clickedZone])
 
   const { mutateAsync: patchZone, isPending: patching } = useUpdateZoningAreaCitiesCityIdZoningZoneIdPatch()
+  const { mutateAsync: deleteZone, isPending: deleting } = useDeleteZoningAreaCitiesCityIdZoningZoneIdDelete()
   const { mutateAsync: regenerate, isPending: regenerating } = useRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost()
-  const isBusy = patching || regenerating
+  const isBusy = patching || deleting || regenerating
 
   if (!clickedZone || !pos) return null
+
+  function extractError(err: unknown): string {
+    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+    return typeof detail === 'string' ? detail : 'Operation failed'
+  }
 
   async function handleSave() {
     if (!selectedCity || !clickedZone) return
@@ -63,86 +75,160 @@ export function ZoneEditPopup() {
       await patchZone({ cityId: selectedCity.id, zoneId: clickedZone.id, data: { zone_type: trimmed } })
       const res = await regenerate({ cityId: selectedCity.id })
       await refreshZoningLayer(res.data.pmtile_url)
-      queryClient.invalidateQueries({ queryKey: getListZoningAreasCitiesCityIdZoningGetQueryKey(selectedCity.id) })
-      queryClient.invalidateQueries({ queryKey: getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey(selectedCity.id) })
+      invalidate(selectedCity.id)
       setClickedZone(null)
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'Save failed')
+    } catch (err) {
+      setError(extractError(err))
     }
+  }
+
+  async function handleDelete() {
+    if (!selectedCity || !clickedZone) return
+    setError(null)
+    try {
+      await deleteZone({ cityId: selectedCity.id, zoneId: clickedZone.id })
+      // Regenerate PMTile — if no zones remain the endpoint will 404 → clear layer
+      try {
+        const res = await regenerate({ cityId: selectedCity.id })
+        await refreshZoningLayer(res.data.pmtile_url)
+      } catch {
+        await refreshZoningLayer(null)
+      }
+      invalidate(selectedCity.id)
+      setClickedZone(null)
+    } catch (err) {
+      setError(extractError(err))
+      setView('edit')
+    }
+  }
+
+  function invalidate(cityId: string) {
+    queryClient.invalidateQueries({ queryKey: getListZoningAreasCitiesCityIdZoningGetQueryKey(cityId) })
+    queryClient.invalidateQueries({ queryKey: getGetZoningPmtilesCitiesCityIdZoningPmtilesGetQueryKey(cityId) })
   }
 
   return (
     <div
       className="absolute z-20 pointer-events-auto"
-      style={{
-        left: pos.x,
-        top: pos.y,
-        transform: 'translate(-50%, calc(-100% - 14px))',
-      }}
+      style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, calc(-100% - 14px))' }}
     >
-      {/* Popup card */}
       <div className="bg-popover border border-border rounded-lg shadow-xl p-3 w-56 space-y-2.5">
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold flex items-center gap-1.5">
-            <PenLine className="size-3.5 text-muted-foreground" /> Edit zone type
+            {view === 'confirm-delete'
+              ? <><AlertTriangle className="size-3.5 text-destructive" /> Delete zone?</>
+              : <><PenLine className="size-3.5 text-muted-foreground" /> Edit zone type</>}
           </span>
           <button
             className="text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => setClickedZone(null)}
             aria-label="Close"
+            disabled={isBusy}
           >
             <X className="size-3.5" />
           </button>
         </div>
 
-        {/* Input */}
-        <Input
-          ref={inputRef}
-          value={label}
-          onChange={e => setLabel(e.target.value)}
-          placeholder="e.g. Agricultural"
-          className="h-7 text-xs"
-          disabled={isBusy}
-          onKeyDown={e => {
-            if (e.key === 'Enter') void handleSave()
-            if (e.key === 'Escape') setClickedZone(null)
-          }}
-        />
+        {view === 'edit' ? (
+          <>
+            {/* Label input */}
+            <Input
+              ref={inputRef}
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              placeholder="e.g. Agricultural"
+              className="h-7 text-xs"
+              disabled={isBusy}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void handleSave()
+                if (e.key === 'Escape') setClickedZone(null)
+              }}
+            />
 
-        {/* Status */}
-        {regenerating && (
-          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-            <Loader2 className="size-3 animate-spin" /> Rebuilding PMTile…
-          </p>
-        )}
-        {error && (
-          <p className="text-[10px] text-destructive">{error}</p>
-        )}
+            {/* Status */}
+            {regenerating && (
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Loader2 className="size-3 animate-spin" /> Rebuilding PMTile…
+              </p>
+            )}
+            {error && <p className="text-[10px] text-destructive">{error}</p>}
 
-        {/* Actions */}
-        <div className="flex gap-1.5">
-          <Button
-            size="sm"
-            className="flex-1 h-7 text-xs gap-1"
-            onClick={handleSave}
-            disabled={isBusy || !label.trim() || label.trim() === clickedZone.zoneType}
-          >
-            {isBusy
-              ? <Loader2 className="size-3 animate-spin" />
-              : <><Check className="size-3" /> Save</>}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={() => setClickedZone(null)}
-            disabled={isBusy}
-          >
-            Cancel
-          </Button>
-        </div>
+            {/* Save / Cancel */}
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                className="flex-1 h-7 text-xs gap-1"
+                onClick={handleSave}
+                disabled={isBusy || !label.trim() || label.trim() === clickedZone.zoneType}
+              >
+                {patching || regenerating
+                  ? <Loader2 className="size-3 animate-spin" />
+                  : <><Check className="size-3" /> Save</>}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => setClickedZone(null)}
+                disabled={isBusy}
+              >
+                Cancel
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Delete trigger */}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-full h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
+              onClick={() => setView('confirm-delete')}
+              disabled={isBusy}
+            >
+              <Trash2 className="size-3" /> Delete zone
+            </Button>
+          </>
+        ) : (
+          <>
+            {/* Confirm delete */}
+            <p className="text-[11px] text-muted-foreground">
+              This zone will be permanently removed and the PMTile rebuilt.
+            </p>
+
+            {regenerating && (
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Loader2 className="size-3 animate-spin" /> Rebuilding PMTile…
+              </p>
+            )}
+            {error && <p className="text-[10px] text-destructive">{error}</p>}
+
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                variant="destructive"
+                className="flex-1 h-7 text-xs gap-1"
+                onClick={handleDelete}
+                disabled={isBusy}
+              >
+                {deleting || regenerating
+                  ? <Loader2 className="size-3 animate-spin" />
+                  : <><Trash2 className="size-3" /> Confirm</>}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => { setView('edit'); setError(null) }}
+                disabled={isBusy}
+              >
+                Back
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Down-pointing arrow */}

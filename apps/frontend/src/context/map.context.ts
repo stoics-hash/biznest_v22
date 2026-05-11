@@ -33,8 +33,8 @@ export interface MapData {
   /** Zone feature clicked on the map. null = no selection. */
   clickedZone: ClickedZone | null
   setClickedZone: (zone: ClickedZone | null) => void
-  /** Re-fetch source-layer from new URL then swap the engine's zoning layer. */
-  refreshZoningLayer: (url: string) => Promise<void>
+  /** Re-fetch source-layer from new URL then swap the engine's zoning layer. Pass null to clear entirely. */
+  refreshZoningLayer: (url: string | null) => Promise<void>
 }
 
 export const MapContext = createContext<MapData>({
