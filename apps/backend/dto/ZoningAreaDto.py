@@ -24,6 +24,7 @@ class ZoningAreaResponse(BaseModel):
     id: UUID
     city_id: UUID
     zone_type: str | None
+    color_hex: str | None  # "#RRGGBB" from K-means cluster; matches legend color swatch
     geometry: dict[str, Any] | None
     pmtile_url: str | None  # MinIO object key; use GET /zoning/pmtiles for a presigned URL
     created_by: UUID | None

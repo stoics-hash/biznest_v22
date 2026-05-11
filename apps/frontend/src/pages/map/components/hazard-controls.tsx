@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
 import type { HazardTile } from '@/engine/map.engine'
-import { useListZoningAreasCitiesCityIdZoningGet } from '@networking/api/generated/zoning/zoning'
+import { useListZoningAreasCitiesCityIdZoningGet, useGetZoningPmtilesCitiesCityIdZoningPmtilesGet } from '@networking/api/generated/zoning/zoning'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -54,6 +54,10 @@ function zoneColor(type: string): string {
   let h = 0
   for (let i = 0; i < type.length; i++) h = (h * 31 + type.charCodeAt(i)) & 0xffff
   return ZONE_PALETTE[h % ZONE_PALETTE.length]
+}
+// If zone_type is itself a hex color (backend fallback when OCR not configured), use it directly.
+function swatchColor(type: string): string {
+  return /^#[0-9a-fA-F]{6}$/.test(type) ? type : zoneColor(type)
 }
 
 function scenarioLabel(scenario: string | null): string {
@@ -144,17 +148,23 @@ function HazardPanel({
 // ── Zoning panel ──────────────────────────────────────────────────────────────
 
 function ZoningPanel() {
-  const { zoningPmtileUrl, showZoning, setShowZoning } = useMapContext()
+  const { showZoning, setShowZoning, visibleZoningTypes, toggleZoningType } = useMapContext()
   const { selectedCity } = useCityContext()
   const navigate = useNavigate()
 
-  const { data, isLoading } = useListZoningAreasCitiesCityIdZoningGet(
+  const { data: pmtilesRes, isLoading: pmtilesLoading } = useGetZoningPmtilesCitiesCityIdZoningPmtilesGet(
+    selectedCity?.id ?? '',
+    { query: { enabled: !!selectedCity?.id, retry: false } },
+  )
+  const pmtileUrl = pmtilesRes?.data?.pmtile_url ?? null
+
+  const { data, isLoading: zonesLoading } = useListZoningAreasCitiesCityIdZoningGet(
     selectedCity?.id ?? '',
     { query: { enabled: !!selectedCity?.id } },
   )
   const zones = data?.data ?? []
+  const isLoading = pmtilesLoading || zonesLoading
 
-  // Group by zone_type for the list display
   const grouped = zones.reduce<Record<string, number>>((acc, z) => {
     const key = z.zone_type ?? '(unlabelled)'
     acc[key] = (acc[key] ?? 0) + 1
@@ -168,7 +178,7 @@ function ZoningPanel() {
     </div>
   )
 
-  if (!zoningPmtileUrl && zones.length === 0) return (
+  if (!pmtileUrl && zones.length === 0) return (
     <div className="flex flex-1 items-center justify-center px-4 text-center">
       <div className="space-y-2.5">
         <LayoutGrid className="mx-auto size-8 text-muted-foreground/40" />
@@ -196,28 +206,71 @@ function ZoningPanel() {
           checked={showZoning}
           onCheckedChange={setShowZoning}
           className="scale-90"
-          disabled={!zoningPmtileUrl}
+          disabled={!pmtileUrl}
         />
       </div>
 
       <Separator className="shrink-0" />
 
-      {/* Zone type list */}
+      {/* PMTile layer status */}
+      {pmtileUrl && (
+        <div className="px-3 py-2 shrink-0 flex items-center gap-2">
+          <div className="size-2 rounded-full bg-green-500 shrink-0" />
+          <span className="text-[11px] text-muted-foreground">Vector tile layer loaded</span>
+        </div>
+      )}
+
+      {/* Zone type list with per-type visibility toggles */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-3 py-2 space-y-0.5">
-          <p className="text-[10px] font-medium text-muted-foreground mb-2">
-            {zones.length} zone{zones.length !== 1 ? 's' : ''} · {zoneTypes.length} type{zoneTypes.length !== 1 ? 's' : ''}
-          </p>
-          {zoneTypes.map(([type, count]) => (
-            <div key={type} className="flex items-center gap-2 py-1.5">
-              <span
-                className="size-2.5 rounded-sm shrink-0"
-                style={{ backgroundColor: zoneColor(type) }}
-              />
-              <span className="text-xs truncate flex-1">{type}</span>
-              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">{count}</span>
-            </div>
-          ))}
+        <div className="px-3 py-2 space-y-0">
+          {/* Header row: count + toggle-all */}
+          <div className="flex items-center justify-between py-1.5 mb-1">
+            <p className="text-[10px] font-medium text-muted-foreground">
+              {zones.length} zone{zones.length !== 1 ? 's' : ''} · {zoneTypes.length} type{zoneTypes.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              onClick={() => {
+                const allTypes = zoneTypes.map(([t]) => t === '(unlabelled)' ? '' : t)
+                const allVisible = visibleZoningTypes === null
+                // Toggle all off → pick first type to trigger the expand logic
+                if (allVisible) {
+                  allTypes.forEach(t => toggleZoningType(t, allTypes))
+                } else {
+                  // Reset to all visible
+                  allTypes.forEach(t => {
+                    if (!visibleZoningTypes!.has(t)) toggleZoningType(t, allTypes)
+                  })
+                }
+              }}
+            >
+              {visibleZoningTypes === null ? 'Hide all' : 'Show all'}
+            </button>
+          </div>
+
+          {zoneTypes.map(([type, count], i) => {
+            const filterKey = type === '(unlabelled)' ? '' : type
+            const allFilterKeys = zoneTypes.map(([t]) => t === '(unlabelled)' ? '' : t)
+            const isVisible = visibleZoningTypes === null || visibleZoningTypes.has(filterKey)
+            return (
+              <div key={type}>
+                {i > 0 && <Separator className="my-0 opacity-30" />}
+                <div className="flex items-center gap-2 py-1.5">
+                  <span
+                    className="size-2.5 rounded-sm shrink-0"
+                    style={{ backgroundColor: swatchColor(type) }}
+                  />
+                  <span className={cn('text-xs truncate flex-1', !isVisible && 'opacity-40 line-through')}>{type}</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground shrink-0 mr-1">{count}</span>
+                  <Switch
+                    checked={isVisible}
+                    onCheckedChange={() => toggleZoningType(filterKey, allFilterKeys)}
+                    className="shrink-0 scale-75"
+                  />
+                </div>
+              </div>
+            )
+          })}
         </div>
       </ScrollArea>
     </div>

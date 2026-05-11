@@ -69,6 +69,20 @@ def get_zoning_pmtiles(city_id: UUID, db: Session = Depends(get_db)):
     return zoning_area_service.get_city_pmtile_url(city_id, db)
 
 
+@router.post("/{city_id}/zoning/regenerate-pmtiles", response_model=ZoningPmtilesResponse)
+def regenerate_zoning_pmtiles(
+    city_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_authenticated_user),
+):
+    """
+    Rebuild the city's zoning PMTile from current DB records.
+    Call after patching zone_type labels via PATCH /{city_id}/zoning/{zone_id}.
+    Returns a fresh presigned URL (5 h TTL).
+    """
+    return zoning_area_service.regenerate_pmtile(city_id, db)
+
+
 @router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
 def get_zoning_area(city_id: UUID, zone_id: UUID, db: Session = Depends(get_db)):
     return zoning_area_service.get_or_404(zone_id, city_id, db)

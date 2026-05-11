@@ -3,6 +3,12 @@ import type { MapEngine, HazardTile } from '@/engine/map.engine'
 
 export type LightPreset = 'dawn' | 'day' | 'dusk' | 'night'
 
+export interface ClickedZone {
+  id: string
+  zoneType: string
+  lngLat: { lng: number; lat: number }
+}
+
 export interface MapData {
   engine: MapEngine | null
   setEngine: (engine: MapEngine | null) => void
@@ -20,6 +26,15 @@ export interface MapData {
   zoningPmtileUrl: string | null
   showZoning: boolean
   setShowZoning: (v: boolean) => void
+  /** null = all types visible (no filter applied). Set = only those zone_type values shown. */
+  visibleZoningTypes: Set<string> | null
+  /** Toggle one zone_type. allTypes = full list of known types for this city. */
+  toggleZoningType: (type: string, allTypes: string[]) => void
+  /** Zone feature clicked on the map. null = no selection. */
+  clickedZone: ClickedZone | null
+  setClickedZone: (zone: ClickedZone | null) => void
+  /** Re-fetch source-layer from new URL then swap the engine's zoning layer. */
+  refreshZoningLayer: (url: string) => Promise<void>
 }
 
 export const MapContext = createContext<MapData>({
@@ -35,6 +50,11 @@ export const MapContext = createContext<MapData>({
   zoningPmtileUrl: null,
   showZoning: true,
   setShowZoning: () => {},
+  visibleZoningTypes: null,
+  toggleZoningType: () => {},
+  clickedZone: null,
+  setClickedZone: () => {},
+  refreshZoningLayer: async () => {},
 })
 
 export const useMapContext = () => useContext(MapContext)

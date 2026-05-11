@@ -71,6 +71,11 @@ export class MapEngine {
   private _cityBoundary: BoundaryGeometry | null = null
   private readonly _hazardKeys = new Set<string>()
   private readonly _imageOverlayIds = new Set<string>()
+  private _zoneClickListeners: {
+    click: (e: maplibregl.MapLayerMouseEvent) => void
+    enter: () => void
+    leave: () => void
+  } | null = null
 
   constructor(map: maplibregl.Map) {
     this._map = map
@@ -465,10 +470,11 @@ export class MapEngine {
 
   // ── Zoning PMTile layer ───────────────────────────────────────────────────────
 
-  /** Load city zoning PMTile as fill + outline layers. Re-entrant — clears previous layer first. */
-  setZoningLayer(url: string, sourceLayer: string): this {
+  /** Load city zoning PMTile as fill + outline layers. Re-entrant — clears previous layer first.
+   *  onReady fires synchronously after layers are added (including when deferred to idle). */
+  setZoningLayer(url: string, sourceLayer: string, onReady?: () => void): this {
     if (!this._map.isStyleLoaded()) {
-      this._map.once('idle', () => this.setZoningLayer(url, sourceLayer))
+      this._map.once('idle', () => this.setZoningLayer(url, sourceLayer, onReady))
       return this
     }
     this.clearZoningLayer()
@@ -479,15 +485,16 @@ export class MapEngine {
       type: 'fill',
       source: ZONING_SOURCE,
       'source-layer': sourceLayer,
-      paint: { 'fill-color': '#10b981', 'fill-opacity': 0.28 },
+      paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.65 },
     }, beforeId)
     this._map.addLayer({
       id: ZONING_LINE,
       type: 'line',
       source: ZONING_SOURCE,
       'source-layer': sourceLayer,
-      paint: { 'line-color': '#059669', 'line-width': 1, 'line-opacity': 0.75 },
+      paint: { 'line-color': ['get', 'color'], 'line-width': 1, 'line-opacity': 0.9 },
     }, beforeId)
+    onReady?.()
     return this
   }
 
@@ -501,6 +508,19 @@ export class MapEngine {
   setZoningLayerVisible(visible: boolean): this {
     this.setLayerVisibility(ZONING_FILL, visible)
     this.setLayerVisibility(ZONING_LINE, visible)
+    return this
+  }
+
+  /** Filter zoning layers to only show the given zone_type values. Pass null to clear the filter (show all). */
+  setZoningTypeFilter(visibleTypes: string[] | null): this {
+    if (!this._map.getLayer(ZONING_FILL)) return this
+    const filter = visibleTypes === null
+      ? null
+      : visibleTypes.length === 0
+        ? ['==', false, true] as unknown as maplibregl.FilterSpecification
+        : ['in', ['get', 'zone_type'], ['literal', visibleTypes]] as unknown as maplibregl.FilterSpecification
+    this._map.setFilter(ZONING_FILL, filter)
+    this._map.setFilter(ZONING_LINE, filter)
     return this
   }
 
@@ -550,7 +570,42 @@ export class MapEngine {
 
   // ── Cleanup ──────────────────────────────────────────────────────────────────
 
+  // ── Zone click handler ────────────────────────────────────────────────────────
+
+  setupZoneClickHandler(handler: (id: string, zoneType: string, lngLat: maplibregl.LngLat) => void): this {
+    this.teardownZoneClickHandler()
+    const click = (e: maplibregl.MapLayerMouseEvent) => {
+      const feat = e.features?.[0]
+      if (!feat) return
+      const props = feat.properties as { id?: string; zone_type?: string }
+      // id may live in feat.properties.id (tippecanoe keeps it as property)
+      // or in feat.id (tippecanoe promoted it to tile feature ID)
+      const id = props.id ?? (feat.id != null ? String(feat.id) : undefined)
+      if (id) handler(id, props.zone_type ?? '', e.lngLat)
+    }
+    const enter = () => { this._map.getCanvas().style.cursor = 'pointer' }
+    const leave = () => { this._map.getCanvas().style.cursor = '' }
+    this._zoneClickListeners = { click, enter, leave }
+    this._map.on('click', ZONING_FILL, click)
+    this._map.on('mouseenter', ZONING_FILL, enter)
+    this._map.on('mouseleave', ZONING_FILL, leave)
+    return this
+  }
+
+  teardownZoneClickHandler(): this {
+    if (!this._zoneClickListeners) return this
+    const { click, enter, leave } = this._zoneClickListeners
+    this._map.off('click', ZONING_FILL, click)
+    this._map.off('mouseenter', ZONING_FILL, enter)
+    this._map.off('mouseleave', ZONING_FILL, leave)
+    this._zoneClickListeners = null
+    return this
+  }
+
+  // ── Cleanup ──────────────────────────────────────────────────────────────────
+
   destroy(): void {
+    this.teardownZoneClickHandler()
     this.clearMarkers()
     this.clearPopups()
     this.clearHazardLayers()

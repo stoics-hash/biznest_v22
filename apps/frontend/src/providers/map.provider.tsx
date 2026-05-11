@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, type PropsWithChildren } from 'react'
-import { MapContext, type LightPreset } from '@/context/map.context'
+import { useState, useEffect, useCallback, useRef, type PropsWithChildren } from 'react'
+import { MapContext, type LightPreset, type ClickedZone } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
-import { listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
+import { listHazardPmtilesCitiesCityIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
 import { getZoningPmtilesCitiesCityIdZoningPmtilesGet } from '@networking/api/generated/zoning/zoning'
 import type { MapEngine, BoundaryGeometry, HazardTile } from '@/engine/map.engine'
 
@@ -41,11 +41,18 @@ export function MapProvider({ children }: PropsWithChildren) {
   const [show3D, setShow3D] = useState(true)
   const [hazardLayers, setHazardLayersState] = useState<HazardTile[]>([])
   const [visibleHazardKeys, setVisibleHazardKeys] = useState<Set<string>>(new Set())
-  const [zoningPmtileUrl, setZoningPmtileUrl] = useState<string | null>(null)
-  const [zoningSourceLayer, setZoningSourceLayer] = useState<string | undefined>(undefined)
+  const [zoningTile, setZoningTile] = useState<{ url: string; sourceLayer: string } | null>(null)
   const [showZoning, setShowZoning] = useState(true)
+  const [visibleZoningTypes, setVisibleZoningTypes] = useState<Set<string> | null>(null)
+  const [clickedZone, setClickedZone] = useState<ClickedZone | null>(null)
 
   const { selectedCity } = useCityContext()
+
+  // Always-current refs so onReady callbacks inside setZoningLayer read latest state.
+  const showZoningRef = useRef(showZoning)
+  showZoningRef.current = showZoning
+  const visibleZoningTypesRef = useRef(visibleZoningTypes)
+  visibleZoningTypesRef.current = visibleZoningTypes
 
   // ── Light preset ─────────────────────────────────────────────────────────
 
@@ -85,11 +92,11 @@ export function MapProvider({ children }: PropsWithChildren) {
   // PMTile URLs are presigned MinIO URLs (5-hour TTL); re-navigating refreshes them.
 
   useEffect(() => {
-    if (!selectedCity?.province_id) return
+    if (!selectedCity?.id) return
 
     let cancelled = false
 
-    listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet(selectedCity.province_id)
+    listHazardPmtilesCitiesCityIdHazardsPmtilesGet(selectedCity.id)
       .then(async res => {
         if (cancelled) return
         const tiles = await enrichWithSourceLayers(res.data as HazardTile[])
@@ -106,7 +113,7 @@ export function MapProvider({ children }: PropsWithChildren) {
       setHazardLayersState([])
       setVisibleHazardKeys(new Set())
     }
-  }, [selectedCity?.province_id])
+  }, [selectedCity?.id])
 
   // ── Zoning PMTile fetch ───────────────────────────────────────────────────
   // City-scoped (one PMTile per city). 404 = no zoning data yet.
@@ -122,8 +129,7 @@ export function MapProvider({ children }: PropsWithChildren) {
         const url = res.data.pmtile_url
         const sl = await discoverSourceLayer(url)
         if (cancelled) return
-        setZoningPmtileUrl(url)
-        setZoningSourceLayer(sl ?? 'zoning')
+        setZoningTile({ url, sourceLayer: sl ?? 'zoning' })
       })
       .catch(() => {
         // City has no zoning data yet — stay cleared.
@@ -131,8 +137,8 @@ export function MapProvider({ children }: PropsWithChildren) {
 
     return () => {
       cancelled = true
-      setZoningPmtileUrl(null)
-      setZoningSourceLayer(undefined)
+      setZoningTile(null)
+      setVisibleZoningTypes(null)
     }
   }, [selectedCity?.id])
 
@@ -140,12 +146,17 @@ export function MapProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!engine) return
-    if (!zoningPmtileUrl || !zoningSourceLayer) {
+    if (!zoningTile) {
       engine.clearZoningLayer()
       return
     }
-    engine.setZoningLayer(zoningPmtileUrl, zoningSourceLayer)
-  }, [engine, zoningPmtileUrl, zoningSourceLayer])
+    engine.setZoningLayer(zoningTile.url, zoningTile.sourceLayer, () => {
+      engine.setZoningLayerVisible(showZoningRef.current)
+      engine.setZoningTypeFilter(
+        visibleZoningTypesRef.current === null ? null : [...visibleZoningTypesRef.current]
+      )
+    })
+  }, [engine, zoningTile])
 
   // ── Sync zoning visibility ────────────────────────────────────────────────
 
@@ -181,6 +192,39 @@ export function MapProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  // ── Sync zoning type filter → engine ─────────────────────────────────────
+
+  useEffect(() => {
+    if (!engine) return
+    engine.setZoningTypeFilter(visibleZoningTypes === null ? null : [...visibleZoningTypes])
+  }, [engine, visibleZoningTypes])
+
+  const toggleZoningType = useCallback((type: string, allTypes: string[]) => {
+    setVisibleZoningTypes(prev => {
+      const expanded = prev === null ? new Set(allTypes) : new Set(prev)
+      if (expanded.has(type)) expanded.delete(type)
+      else expanded.add(type)
+      // All types visible → clear filter
+      if (expanded.size === allTypes.length) return null
+      return expanded
+    })
+  }, [])
+
+  // ── Zone click handler ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!engine) return
+    engine.setupZoneClickHandler((id, zoneType, lngLat) => {
+      setClickedZone({ id, zoneType, lngLat: { lng: lngLat.lng, lat: lngLat.lat } })
+    })
+    return () => { engine.teardownZoneClickHandler() }
+  }, [engine])
+
+  const refreshZoningLayer = useCallback(async (url: string) => {
+    const sl = await discoverSourceLayer(url)
+    setZoningTile({ url, sourceLayer: sl ?? 'zoning' })
+  }, [])
+
   return (
     <MapContext.Provider value={{
       engine, setEngine,
@@ -189,9 +233,14 @@ export function MapProvider({ children }: PropsWithChildren) {
       hazardLayers,
       visibleHazardKeys,
       toggleHazard,
-      zoningPmtileUrl,
+      zoningPmtileUrl: zoningTile?.url ?? null,
       showZoning,
       setShowZoning,
+      visibleZoningTypes,
+      toggleZoningType,
+      clickedZone,
+      setClickedZone,
+      refreshZoningLayer,
     }}>
       {children}
     </MapContext.Provider>

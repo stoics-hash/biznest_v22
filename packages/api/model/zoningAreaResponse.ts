@@ -10,6 +10,7 @@ export interface ZoningAreaResponse {
   id: string;
   city_id: string;
   zone_type: string | null;
+  color_hex: string | null;
   geometry: ZoningAreaResponseGeometry;
   pmtile_url: string | null;
   created_by: string | null;

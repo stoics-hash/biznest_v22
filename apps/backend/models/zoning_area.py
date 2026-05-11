@@ -17,6 +17,7 @@ class ZoningArea(Base):
     city_id = Column(UUID(as_uuid=True), ForeignKey("cities.id", ondelete="CASCADE"), nullable=False)
 
     zone_type = Column(String(100))
+    color_hex = Column(String(7), nullable=True)   # "#RRGGBB" from K-means cluster centre
     geometry = Column(Geometry("GEOMETRY", srid=4326, spatial_index=True), nullable=True)
     pmtile_url = Column(String(500), nullable=True)  # MinIO object key for city-level zoning PMTile
 

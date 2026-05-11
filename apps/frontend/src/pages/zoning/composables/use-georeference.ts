@@ -59,8 +59,8 @@ export function useGeoreference() {
   const stateRef = useRef(state)
 
   useEffect(() => {
-    stateRef.current = state;
-  }, [engine]);
+    stateRef.current = state
+  }, [state])
 
   const loadImage = useCallback((file: File) => {
     const url = URL.createObjectURL(file)
