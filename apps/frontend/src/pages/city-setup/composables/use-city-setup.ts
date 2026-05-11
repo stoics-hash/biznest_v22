@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
-import { listCitiesCitiesGet, createCityCitiesPost } from '@networking/api/generated/cities/cities'
+import { listCitiesCitiesGet, createCityCitiesPost, getCityCitiesCityIdGet } from '@networking/api/generated/cities/cities'
 import { myAccessCityAccessMeGet, grantAccessCityAccessPost } from '@networking/api/generated/city-access/city-access'
 import { listAssignmentsLguAssignmentsGet, createAssignmentLguAssignmentsPost } from '@networking/api/generated/lgu-assignments/lgu-assignments'
 import { getMySubscriptionSubscriptionsMeGet } from '@networking/api/generated/subscriptions/subscriptions'
@@ -17,8 +17,8 @@ export function useCitySetup() {
   const router = useRouter()
 
   const { data: allCities = [], isLoading: citiesLoading } = useQuery({
-    queryKey: ['/cities/'],
-    queryFn: () => listCitiesCitiesGet().then(r => r.data),
+    queryKey: ['/cities/', { include_geometry: false }],
+    queryFn: () => listCitiesCitiesGet({ include_geometry: false }).then(r => r.data),
   })
 
   const { data: myAccess = [], isLoading: accessLoading } = useQuery({
@@ -55,7 +55,11 @@ export function useCitySetup() {
   const atLimit = maxCities !== null && myCityIds.length >= maxCities
 
   async function enterCity(city: CityResponse) {
-    selectCity(city)
+    // Fetch with geometry so MapProvider can fly to + draw the boundary
+    const fullCity = await getCityCitiesCityIdGet(city.id)
+      .then(r => r.data)
+      .catch(() => city) // fallback to geometry-less city if fetch fails
+    selectCity(fullCity)
     await refreshCities()
     void router.navigate({ to: '/dashboard' })
   }

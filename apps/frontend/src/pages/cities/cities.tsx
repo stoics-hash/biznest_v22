@@ -28,8 +28,8 @@ export function CitiesPage() {
   const [page, setPage] = useState(1)
 
   const { data: cities = [], isLoading } = useQuery({
-    queryKey: ['/cities/'],
-    queryFn: () => listCitiesCitiesGet().then(r => r.data),
+    queryKey: ['/cities/', { include_geometry: false }],
+    queryFn: () => listCitiesCitiesGet({ include_geometry: false }).then(r => r.data),
   })
 
   const createCity = useMutation({

@@ -2,6 +2,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 
+import redis as redis_lib
 from fastapi import HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -14,15 +15,37 @@ from models.subscription_plan import SubscriptionPlan
 from models.user import User
 from models.user_role import UserRole
 from services.auth_service import (
+    USER_CACHE_KEY,
+    USER_CACHE_TTL,
+    _pack_user,
     clear_auth_cookie,
     clear_refresh_cookie,
     set_auth_cookie,
     set_refresh_cookie,
+    user_to_cache_dict,
 )
 from utils.jwtUtils import create_jwt, hash_password, hash_token, verify_password
 
 
-def register(payload: RegisterRequest, response: Response, db: Session) -> AuthResponse:
+def _warm_user_cache(user: User, rc: redis_lib.Redis | None) -> None:
+    """Write user to Redis after login or register. Skips silently on any error."""
+    if rc is None:
+        return
+    try:
+        rc.setex(USER_CACHE_KEY.format(user.id), USER_CACHE_TTL, _pack_user(user_to_cache_dict(user)))
+    except Exception:
+        pass
+
+
+def _invalidate_user_cache(user_id, rc: redis_lib.Redis | None) -> None:
+    if rc:
+        try:
+            rc.delete(USER_CACHE_KEY.format(user_id))
+        except Exception:
+            pass
+
+
+def register(payload: RegisterRequest, response: Response, db: Session, rc: redis_lib.Redis | None = None) -> AuthResponse:
     existing = db.query(User).filter(
         (User.username == payload.username) | (User.email == payload.email)
     ).first()
@@ -51,10 +74,12 @@ def register(payload: RegisterRequest, response: Response, db: Session) -> AuthR
     db.refresh(user)
 
     access_token, raw_refresh = create_auth_session(user, response, db)
+    _warm_user_cache(user, rc)
     return _auth_response(user, access_token, raw_refresh)
 
 
-def login(payload: LoginRequest, response: Response, db: Session) -> AuthResponse:
+def login(payload: LoginRequest, response: Response, db: Session, rc: redis_lib.Redis | None = None) -> AuthResponse:
+    # Password verification always hits DB — never use cached user for auth checks
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -62,27 +87,30 @@ def login(payload: LoginRequest, response: Response, db: Session) -> AuthRespons
         raise HTTPException(status_code=403, detail="User is inactive")
 
     access_token, raw_refresh = create_auth_session(user, response, db)
+    _warm_user_cache(user, rc)   # prime cache so first /me after login is cache hit
     return _auth_response(user, access_token, raw_refresh)
 
 
-def logout(response: Response, raw_refresh_token: str | None, db: Session) -> None:
+def logout(response: Response, raw_refresh_token: str | None, db: Session, rc: redis_lib.Redis | None = None) -> None:
     if raw_refresh_token:
         rt = db.query(RefreshToken).filter(
             RefreshToken.token_hash == hash_token(raw_refresh_token)
         ).first()
         if rt and rt.revoked_at is None:
             rt.revoked_at = datetime.now(timezone.utc)
+            _invalidate_user_cache(rt.user_id, rc)
             db.commit()
     clear_auth_cookie(response)
     clear_refresh_cookie(response)
 
 
-def logout_all(user: User, response: Response, db: Session) -> None:
+def logout_all(user: User, response: Response, db: Session, rc: redis_lib.Redis | None = None) -> None:
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
         RefreshToken.revoked_at.is_(None),
     ).update({"revoked_at": datetime.now(timezone.utc)})
     db.commit()
+    _invalidate_user_cache(user.id, rc)
     clear_auth_cookie(response)
     clear_refresh_cookie(response)
 
