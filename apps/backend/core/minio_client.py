@@ -1,9 +1,15 @@
 from minio import Minio
+import os
+
+MINIO_URL = os.environ.get("MINIO_URL")
+MINIO_USERNAME = os.environ.get("MINIO_USERNAME")
+MINIO_PASSWORD = os.environ.get("MINIO_PASSWORD")
+
 
 minio_client = Minio(
-    "localhost:9000",
-    access_key="minio",
-    secret_key="minio123",
+    MINIO_URL,
+    access_key=MINIO_USERNAME,
+    secret_key=MINIO_PASSWORD,
     secure=False,
 )
 

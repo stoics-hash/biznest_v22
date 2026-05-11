@@ -11,15 +11,15 @@ from models.hazard_area import HazardArea
 _PMTILE_URL_TTL = timedelta(hours=5)
 
 
-def get_pmtiles_by_province(
-    province_id: UUID,
+def get_pmtiles_by_city(
+    city_id: UUID,
     db: Session,
     hazard_type: str | None = None,
     scenario: str | None = None,
 ) -> list[HazardPmtileResponse]:
     q = (
         db.query(HazardArea.hazard_type, HazardArea.scenario, HazardArea.pmtile_url)
-        .filter(HazardArea.province_id == province_id, HazardArea.pmtile_url.isnot(None))
+        .filter(HazardArea.city_id == city_id, HazardArea.pmtile_url.isnot(None))
     )
     if hazard_type:
         q = q.filter(HazardArea.hazard_type == hazard_type)
@@ -36,14 +36,14 @@ def get_pmtiles_by_province(
     ]
 
 
-def get_by_province(province_id: UUID, db: Session) -> list[HazardArea]:
-    return db.query(HazardArea).filter(HazardArea.province_id == province_id).all()
+def get_by_city(city_id: UUID, db: Session) -> list[HazardArea]:
+    return db.query(HazardArea).filter(HazardArea.city_id == city_id).all()
 
 
-def get_or_404(hazard_id: UUID, province_id: UUID, db: Session) -> HazardArea:
+def get_or_404(hazard_id: UUID, city_id: UUID, db: Session) -> HazardArea:
     hazard = (
         db.query(HazardArea)
-        .filter(HazardArea.id == hazard_id, HazardArea.province_id == province_id)
+        .filter(HazardArea.id == hazard_id, HazardArea.city_id == city_id)
         .first()
     )
     if not hazard:
@@ -51,9 +51,9 @@ def get_or_404(hazard_id: UUID, province_id: UUID, db: Session) -> HazardArea:
     return hazard
 
 
-def create(province_id: UUID, payload: HazardAreaCreate, created_by: UUID, db: Session) -> HazardArea:
+def create(city_id: UUID, payload: HazardAreaCreate, created_by: UUID, db: Session) -> HazardArea:
     hazard = HazardArea(
-        province_id=province_id,
+        city_id=city_id,
         created_by=created_by,
         **payload.model_dump(),
     )
@@ -63,8 +63,8 @@ def create(province_id: UUID, payload: HazardAreaCreate, created_by: UUID, db: S
     return hazard
 
 
-def update(hazard_id: UUID, province_id: UUID, payload: HazardAreaUpdate, db: Session) -> HazardArea:
-    hazard = get_or_404(hazard_id, province_id, db)
+def update(hazard_id: UUID, city_id: UUID, payload: HazardAreaUpdate, db: Session) -> HazardArea:
+    hazard = get_or_404(hazard_id, city_id, db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(hazard, field, value)
     db.commit()
@@ -72,7 +72,7 @@ def update(hazard_id: UUID, province_id: UUID, payload: HazardAreaUpdate, db: Se
     return hazard
 
 
-def delete(hazard_id: UUID, province_id: UUID, db: Session) -> None:
-    hazard = get_or_404(hazard_id, province_id, db)
+def delete(hazard_id: UUID, city_id: UUID, db: Session) -> None:
+    hazard = get_or_404(hazard_id, city_id, db)
     db.delete(hazard)
     db.commit()

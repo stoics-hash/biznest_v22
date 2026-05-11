@@ -31,7 +31,7 @@ import type {
   HazardAreaSummary,
   HazardAreaUpdate,
   HazardPmtileResponse,
-  ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams
+  ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams
 } from '../../model';
 
 
@@ -45,14 +45,14 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 /**
  * @summary List Hazard Pmtiles
  */
-export const listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet = (
-    provinceId: string,
-    params?: ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams, options?: AxiosRequestConfig
+export const listHazardPmtilesCitiesCityIdHazardsPmtilesGet = (
+    cityId: string,
+    params?: ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<HazardPmtileResponse[]>> => {
 
 
     return axios.default.get(
-      `/provinces/${provinceId}/hazards/pmtiles`,{
+      `/cities/${cityId}/hazards/pmtiles`,{
     ...options,
         params: {...params, ...options?.params},}
     );
@@ -61,48 +61,48 @@ export const listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet = (
 
 
 
-export const getListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetQueryKey = (provinceId: string,
-    params?: ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams,) => {
+export const getListHazardPmtilesCitiesCityIdHazardsPmtilesGetQueryKey = (cityId: string,
+    params?: ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams,) => {
     return [
-    `/provinces/${provinceId}/hazards/pmtiles`, ...(params ? [params] : [])
+    `/cities/${cityId}/hazards/pmtiles`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetQueryOptions = <TData = Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(provinceId: string,
-    params?: ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export const getListHazardPmtilesCitiesCityIdHazardsPmtilesGetQueryOptions = <TData = Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string,
+    params?: ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
 ) => {
 
 const {query: queryOptions, axios: axiosOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetQueryKey(provinceId,params);
+  const queryKey =  queryOptions?.queryKey ?? getListHazardPmtilesCitiesCityIdHazardsPmtilesGetQueryKey(cityId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>> = ({ signal }) => listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet(provinceId,params, { signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>> = ({ signal }) => listHazardPmtilesCitiesCityIdHazardsPmtilesGet(cityId,params, { signal, ...axiosOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(provinceId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetQueryResult = NonNullable<Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>>
-export type ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetQueryError = AxiosError<HTTPValidationError>
+export type ListHazardPmtilesCitiesCityIdHazardsPmtilesGetQueryResult = NonNullable<Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>>
+export type ListHazardPmtilesCitiesCityIdHazardsPmtilesGetQueryError = AxiosError<HTTPValidationError>
 
 
 /**
  * @summary List Hazard Pmtiles
  */
 
-export function useListHazardPmtilesProvincesProvinceIdHazardsPmtilesGet<TData = Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(
- provinceId: string,
-    params?: ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardPmtilesProvincesProvinceIdHazardsPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export function useListHazardPmtilesCitiesCityIdHazardsPmtilesGet<TData = Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string,
+    params?: ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardPmtilesCitiesCityIdHazardsPmtilesGet>>, TError, TData>, axios?: AxiosRequestConfig}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetQueryOptions(provinceId,params,options)
+  const queryOptions = getListHazardPmtilesCitiesCityIdHazardsPmtilesGetQueryOptions(cityId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -117,58 +117,58 @@ export function useListHazardPmtilesProvincesProvinceIdHazardsPmtilesGet<TData =
 /**
  * @summary List Hazard Areas
  */
-export const listHazardAreasProvincesProvinceIdHazardsGet = (
-    provinceId: string, options?: AxiosRequestConfig
+export const listHazardAreasCitiesCityIdHazardsGet = (
+    cityId: string, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<HazardAreaSummary[]>> => {
 
 
     return axios.default.get(
-      `/provinces/${provinceId}/hazards`,options
+      `/cities/${cityId}/hazards`,options
     );
   }
 
 
 
 
-export const getListHazardAreasProvincesProvinceIdHazardsGetQueryKey = (provinceId: string,) => {
+export const getListHazardAreasCitiesCityIdHazardsGetQueryKey = (cityId: string,) => {
     return [
-    `/provinces/${provinceId}/hazards`
+    `/cities/${cityId}/hazards`
     ] as const;
     }
 
 
-export const getListHazardAreasProvincesProvinceIdHazardsGetQueryOptions = <TData = Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>, TError = AxiosError<HTTPValidationError>>(provinceId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export const getListHazardAreasCitiesCityIdHazardsGetQueryOptions = <TData = Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>, TError, TData>, axios?: AxiosRequestConfig}
 ) => {
 
 const {query: queryOptions, axios: axiosOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListHazardAreasProvincesProvinceIdHazardsGetQueryKey(provinceId);
+  const queryKey =  queryOptions?.queryKey ?? getListHazardAreasCitiesCityIdHazardsGetQueryKey(cityId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>> = ({ signal }) => listHazardAreasProvincesProvinceIdHazardsGet(provinceId, { signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>> = ({ signal }) => listHazardAreasCitiesCityIdHazardsGet(cityId, { signal, ...axiosOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(provinceId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type ListHazardAreasProvincesProvinceIdHazardsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>>
-export type ListHazardAreasProvincesProvinceIdHazardsGetQueryError = AxiosError<HTTPValidationError>
+export type ListHazardAreasCitiesCityIdHazardsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>>
+export type ListHazardAreasCitiesCityIdHazardsGetQueryError = AxiosError<HTTPValidationError>
 
 
 /**
  * @summary List Hazard Areas
  */
 
-export function useListHazardAreasProvincesProvinceIdHazardsGet<TData = Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>, TError = AxiosError<HTTPValidationError>>(
- provinceId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardAreasProvincesProvinceIdHazardsGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export function useListHazardAreasCitiesCityIdHazardsGet<TData = Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHazardAreasCitiesCityIdHazardsGet>>, TError, TData>, axios?: AxiosRequestConfig}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListHazardAreasProvincesProvinceIdHazardsGetQueryOptions(provinceId,options)
+  const queryOptions = getListHazardAreasCitiesCityIdHazardsGetQueryOptions(cityId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -183,25 +183,25 @@ export function useListHazardAreasProvincesProvinceIdHazardsGet<TData = Awaited<
 /**
  * @summary Create Hazard Area
  */
-export const createHazardAreaProvincesProvinceIdHazardsPost = (
-    provinceId: string,
+export const createHazardAreaCitiesCityIdHazardsPost = (
+    cityId: string,
     hazardAreaCreate: HazardAreaCreate, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<HazardAreaSummary>> => {
 
 
     return axios.default.post(
-      `/provinces/${provinceId}/hazards`,
+      `/cities/${cityId}/hazards`,
       hazardAreaCreate,options
     );
   }
 
 
 
-export const getCreateHazardAreaProvincesProvinceIdHazardsPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHazardAreaProvincesProvinceIdHazardsPost>>, TError,{provinceId: string;data: HazardAreaCreate}, TContext>, axios?: AxiosRequestConfig}
-): UseMutationOptions<Awaited<ReturnType<typeof createHazardAreaProvincesProvinceIdHazardsPost>>, TError,{provinceId: string;data: HazardAreaCreate}, TContext> => {
+export const getCreateHazardAreaCitiesCityIdHazardsPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHazardAreaCitiesCityIdHazardsPost>>, TError,{cityId: string;data: HazardAreaCreate}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof createHazardAreaCitiesCityIdHazardsPost>>, TError,{cityId: string;data: HazardAreaCreate}, TContext> => {
 
-const mutationKey = ['createHazardAreaProvincesProvinceIdHazardsPost'];
+const mutationKey = ['createHazardAreaCitiesCityIdHazardsPost'];
 const {mutation: mutationOptions, axios: axiosOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -211,10 +211,10 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createHazardAreaProvincesProvinceIdHazardsPost>>, {provinceId: string;data: HazardAreaCreate}> = (props) => {
-          const {provinceId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createHazardAreaCitiesCityIdHazardsPost>>, {cityId: string;data: HazardAreaCreate}> = (props) => {
+          const {cityId,data} = props ?? {};
 
-          return  createHazardAreaProvincesProvinceIdHazardsPost(provinceId,data,axiosOptions)
+          return  createHazardAreaCitiesCityIdHazardsPost(cityId,data,axiosOptions)
         }
 
 
@@ -224,82 +224,82 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CreateHazardAreaProvincesProvinceIdHazardsPostMutationResult = NonNullable<Awaited<ReturnType<typeof createHazardAreaProvincesProvinceIdHazardsPost>>>
-    export type CreateHazardAreaProvincesProvinceIdHazardsPostMutationBody = HazardAreaCreate
-    export type CreateHazardAreaProvincesProvinceIdHazardsPostMutationError = AxiosError<HTTPValidationError>
+    export type CreateHazardAreaCitiesCityIdHazardsPostMutationResult = NonNullable<Awaited<ReturnType<typeof createHazardAreaCitiesCityIdHazardsPost>>>
+    export type CreateHazardAreaCitiesCityIdHazardsPostMutationBody = HazardAreaCreate
+    export type CreateHazardAreaCitiesCityIdHazardsPostMutationError = AxiosError<HTTPValidationError>
 
     /**
  * @summary Create Hazard Area
  */
-export const useCreateHazardAreaProvincesProvinceIdHazardsPost = <TError = AxiosError<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHazardAreaProvincesProvinceIdHazardsPost>>, TError,{provinceId: string;data: HazardAreaCreate}, TContext>, axios?: AxiosRequestConfig}
+export const useCreateHazardAreaCitiesCityIdHazardsPost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createHazardAreaCitiesCityIdHazardsPost>>, TError,{cityId: string;data: HazardAreaCreate}, TContext>, axios?: AxiosRequestConfig}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof createHazardAreaProvincesProvinceIdHazardsPost>>,
+        Awaited<ReturnType<typeof createHazardAreaCitiesCityIdHazardsPost>>,
         TError,
-        {provinceId: string;data: HazardAreaCreate},
+        {cityId: string;data: HazardAreaCreate},
         TContext
       > => {
-      return useMutation(getCreateHazardAreaProvincesProvinceIdHazardsPostMutationOptions(options));
+      return useMutation(getCreateHazardAreaCitiesCityIdHazardsPostMutationOptions(options));
     }
     /**
  * @summary Get Hazard Area
  */
-export const getHazardAreaProvincesProvinceIdHazardsHazardIdGet = (
-    provinceId: string,
+export const getHazardAreaCitiesCityIdHazardsHazardIdGet = (
+    cityId: string,
     hazardId: string, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<HazardAreaSummary>> => {
 
 
     return axios.default.get(
-      `/provinces/${provinceId}/hazards/${hazardId}`,options
+      `/cities/${cityId}/hazards/${hazardId}`,options
     );
   }
 
 
 
 
-export const getGetHazardAreaProvincesProvinceIdHazardsHazardIdGetQueryKey = (provinceId: string,
+export const getGetHazardAreaCitiesCityIdHazardsHazardIdGetQueryKey = (cityId: string,
     hazardId: string,) => {
     return [
-    `/provinces/${provinceId}/hazards/${hazardId}`
+    `/cities/${cityId}/hazards/${hazardId}`
     ] as const;
     }
 
 
-export const getGetHazardAreaProvincesProvinceIdHazardsHazardIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>, TError = AxiosError<HTTPValidationError>>(provinceId: string,
-    hazardId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export const getGetHazardAreaCitiesCityIdHazardsHazardIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string,
+    hazardId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>, TError, TData>, axios?: AxiosRequestConfig}
 ) => {
 
 const {query: queryOptions, axios: axiosOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetHazardAreaProvincesProvinceIdHazardsHazardIdGetQueryKey(provinceId,hazardId);
+  const queryKey =  queryOptions?.queryKey ?? getGetHazardAreaCitiesCityIdHazardsHazardIdGetQueryKey(cityId,hazardId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>> = ({ signal }) => getHazardAreaProvincesProvinceIdHazardsHazardIdGet(provinceId,hazardId, { signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>> = ({ signal }) => getHazardAreaCitiesCityIdHazardsHazardIdGet(cityId,hazardId, { signal, ...axiosOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(provinceId && hazardId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(cityId && hazardId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetHazardAreaProvincesProvinceIdHazardsHazardIdGetQueryResult = NonNullable<Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>>
-export type GetHazardAreaProvincesProvinceIdHazardsHazardIdGetQueryError = AxiosError<HTTPValidationError>
+export type GetHazardAreaCitiesCityIdHazardsHazardIdGetQueryResult = NonNullable<Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>>
+export type GetHazardAreaCitiesCityIdHazardsHazardIdGetQueryError = AxiosError<HTTPValidationError>
 
 
 /**
  * @summary Get Hazard Area
  */
 
-export function useGetHazardAreaProvincesProvinceIdHazardsHazardIdGet<TData = Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>, TError = AxiosError<HTTPValidationError>>(
- provinceId: string,
-    hazardId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardAreaProvincesProvinceIdHazardsHazardIdGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export function useGetHazardAreaCitiesCityIdHazardsHazardIdGet<TData = Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string,
+    hazardId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardAreaCitiesCityIdHazardsHazardIdGet>>, TError, TData>, axios?: AxiosRequestConfig}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetHazardAreaProvincesProvinceIdHazardsHazardIdGetQueryOptions(provinceId,hazardId,options)
+  const queryOptions = getGetHazardAreaCitiesCityIdHazardsHazardIdGetQueryOptions(cityId,hazardId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -314,26 +314,26 @@ export function useGetHazardAreaProvincesProvinceIdHazardsHazardIdGet<TData = Aw
 /**
  * @summary Update Hazard Area
  */
-export const updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch = (
-    provinceId: string,
+export const updateHazardAreaCitiesCityIdHazardsHazardIdPatch = (
+    cityId: string,
     hazardId: string,
     hazardAreaUpdate: HazardAreaUpdate, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<HazardAreaSummary>> => {
 
 
     return axios.default.patch(
-      `/provinces/${provinceId}/hazards/${hazardId}`,
+      `/cities/${cityId}/hazards/${hazardId}`,
       hazardAreaUpdate,options
     );
   }
 
 
 
-export const getUpdateHazardAreaProvincesProvinceIdHazardsHazardIdPatchMutationOptions = <TError = AxiosError<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch>>, TError,{provinceId: string;hazardId: string;data: HazardAreaUpdate}, TContext>, axios?: AxiosRequestConfig}
-): UseMutationOptions<Awaited<ReturnType<typeof updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch>>, TError,{provinceId: string;hazardId: string;data: HazardAreaUpdate}, TContext> => {
+export const getUpdateHazardAreaCitiesCityIdHazardsHazardIdPatchMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHazardAreaCitiesCityIdHazardsHazardIdPatch>>, TError,{cityId: string;hazardId: string;data: HazardAreaUpdate}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHazardAreaCitiesCityIdHazardsHazardIdPatch>>, TError,{cityId: string;hazardId: string;data: HazardAreaUpdate}, TContext> => {
 
-const mutationKey = ['updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch'];
+const mutationKey = ['updateHazardAreaCitiesCityIdHazardsHazardIdPatch'];
 const {mutation: mutationOptions, axios: axiosOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -343,10 +343,10 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch>>, {provinceId: string;hazardId: string;data: HazardAreaUpdate}> = (props) => {
-          const {provinceId,hazardId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHazardAreaCitiesCityIdHazardsHazardIdPatch>>, {cityId: string;hazardId: string;data: HazardAreaUpdate}> = (props) => {
+          const {cityId,hazardId,data} = props ?? {};
 
-          return  updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch(provinceId,hazardId,data,axiosOptions)
+          return  updateHazardAreaCitiesCityIdHazardsHazardIdPatch(cityId,hazardId,data,axiosOptions)
         }
 
 
@@ -356,44 +356,44 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateHazardAreaProvincesProvinceIdHazardsHazardIdPatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch>>>
-    export type UpdateHazardAreaProvincesProvinceIdHazardsHazardIdPatchMutationBody = HazardAreaUpdate
-    export type UpdateHazardAreaProvincesProvinceIdHazardsHazardIdPatchMutationError = AxiosError<HTTPValidationError>
+    export type UpdateHazardAreaCitiesCityIdHazardsHazardIdPatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateHazardAreaCitiesCityIdHazardsHazardIdPatch>>>
+    export type UpdateHazardAreaCitiesCityIdHazardsHazardIdPatchMutationBody = HazardAreaUpdate
+    export type UpdateHazardAreaCitiesCityIdHazardsHazardIdPatchMutationError = AxiosError<HTTPValidationError>
 
     /**
  * @summary Update Hazard Area
  */
-export const useUpdateHazardAreaProvincesProvinceIdHazardsHazardIdPatch = <TError = AxiosError<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch>>, TError,{provinceId: string;hazardId: string;data: HazardAreaUpdate}, TContext>, axios?: AxiosRequestConfig}
+export const useUpdateHazardAreaCitiesCityIdHazardsHazardIdPatch = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHazardAreaCitiesCityIdHazardsHazardIdPatch>>, TError,{cityId: string;hazardId: string;data: HazardAreaUpdate}, TContext>, axios?: AxiosRequestConfig}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof updateHazardAreaProvincesProvinceIdHazardsHazardIdPatch>>,
+        Awaited<ReturnType<typeof updateHazardAreaCitiesCityIdHazardsHazardIdPatch>>,
         TError,
-        {provinceId: string;hazardId: string;data: HazardAreaUpdate},
+        {cityId: string;hazardId: string;data: HazardAreaUpdate},
         TContext
       > => {
-      return useMutation(getUpdateHazardAreaProvincesProvinceIdHazardsHazardIdPatchMutationOptions(options));
+      return useMutation(getUpdateHazardAreaCitiesCityIdHazardsHazardIdPatchMutationOptions(options));
     }
     /**
  * @summary Delete Hazard Area
  */
-export const deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete = (
-    provinceId: string,
+export const deleteHazardAreaCitiesCityIdHazardsHazardIdDelete = (
+    cityId: string,
     hazardId: string, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<void>> => {
 
 
     return axios.default.delete(
-      `/provinces/${provinceId}/hazards/${hazardId}`,options
+      `/cities/${cityId}/hazards/${hazardId}`,options
     );
   }
 
 
 
-export const getDeleteHazardAreaProvincesProvinceIdHazardsHazardIdDeleteMutationOptions = <TError = AxiosError<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete>>, TError,{provinceId: string;hazardId: string}, TContext>, axios?: AxiosRequestConfig}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete>>, TError,{provinceId: string;hazardId: string}, TContext> => {
+export const getDeleteHazardAreaCitiesCityIdHazardsHazardIdDeleteMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHazardAreaCitiesCityIdHazardsHazardIdDelete>>, TError,{cityId: string;hazardId: string}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteHazardAreaCitiesCityIdHazardsHazardIdDelete>>, TError,{cityId: string;hazardId: string}, TContext> => {
 
-const mutationKey = ['deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete'];
+const mutationKey = ['deleteHazardAreaCitiesCityIdHazardsHazardIdDelete'];
 const {mutation: mutationOptions, axios: axiosOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -403,10 +403,10 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete>>, {provinceId: string;hazardId: string}> = (props) => {
-          const {provinceId,hazardId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteHazardAreaCitiesCityIdHazardsHazardIdDelete>>, {cityId: string;hazardId: string}> = (props) => {
+          const {cityId,hazardId} = props ?? {};
 
-          return  deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete(provinceId,hazardId,axiosOptions)
+          return  deleteHazardAreaCitiesCityIdHazardsHazardIdDelete(cityId,hazardId,axiosOptions)
         }
 
 
@@ -416,20 +416,20 @@ const {mutation: mutationOptions, axios: axiosOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type DeleteHazardAreaProvincesProvinceIdHazardsHazardIdDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete>>>
+    export type DeleteHazardAreaCitiesCityIdHazardsHazardIdDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteHazardAreaCitiesCityIdHazardsHazardIdDelete>>>
 
-    export type DeleteHazardAreaProvincesProvinceIdHazardsHazardIdDeleteMutationError = AxiosError<HTTPValidationError>
+    export type DeleteHazardAreaCitiesCityIdHazardsHazardIdDeleteMutationError = AxiosError<HTTPValidationError>
 
     /**
  * @summary Delete Hazard Area
  */
-export const useDeleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete = <TError = AxiosError<HTTPValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete>>, TError,{provinceId: string;hazardId: string}, TContext>, axios?: AxiosRequestConfig}
+export const useDeleteHazardAreaCitiesCityIdHazardsHazardIdDelete = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteHazardAreaCitiesCityIdHazardsHazardIdDelete>>, TError,{cityId: string;hazardId: string}, TContext>, axios?: AxiosRequestConfig}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof deleteHazardAreaProvincesProvinceIdHazardsHazardIdDelete>>,
+        Awaited<ReturnType<typeof deleteHazardAreaCitiesCityIdHazardsHazardIdDelete>>,
         TError,
-        {provinceId: string;hazardId: string},
+        {cityId: string;hazardId: string},
         TContext
       > => {
-      return useMutation(getDeleteHazardAreaProvincesProvinceIdHazardsHazardIdDeleteMutationOptions(options));
+      return useMutation(getDeleteHazardAreaCitiesCityIdHazardsHazardIdDeleteMutationOptions(options));
     }

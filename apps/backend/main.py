@@ -25,8 +25,10 @@ from routes.user_roles import router as user_roles_router
 from routes.saved_locations import router as saved_locations_router
 from routes.audit_logs import router as audit_logs_router
 
+# Create all tables from SQLAlchemy models (idempotent for local dev)
 Base.metadata.create_all(bind=engine)
 
+# Seed data after tables are created
 with SessionLocal() as db:
     seed(db)
 
@@ -46,7 +48,7 @@ app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(files_router, prefix="/files", tags=["files"])
 app.include_router(cities_router, prefix="/cities", tags=["cities"])
 app.include_router(zoning_router, prefix="/cities", tags=["zoning"])
-app.include_router(hazard_router, prefix="/provinces", tags=["hazards"])
+app.include_router(hazard_router, prefix="/cities", tags=["hazards"])
 app.include_router(establishments_router, prefix="/cities", tags=["establishments"])
 app.include_router(alerts_router, prefix="/cities", tags=["alerts"])
 app.include_router(subscriptions_router, prefix="/subscriptions", tags=["subscriptions"])

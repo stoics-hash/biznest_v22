@@ -84,11 +84,11 @@ models/
 dto/                 # Pydantic request/response schemas (PascalCase filenames: UserDto.py)
 routes/              # Thin route handlers — delegate entirely to services
 services/            # Business logic (one file per domain)
+  auth_service.py    # Cookie helpers, get_authenticated_user (cookie or Bearer header)
+  geo_processing_service.py  # CV/ML pipeline: image → zoning polygons (see below)
 utils/
   jwtUtils.py        # JWT creation (custom HS256), SHA256+salt password hashing, get_db
   email_utils.py     # SMTP email sender (silent no-op if SMTP_HOST unset)
-services/
-  auth_service.py    # Cookie helpers, get_authenticated_user (cookie or Bearer header)
 scripts/             # One-off data seeders (run manually)
 boundaries/          # Local GeoJSON files for PH administrative boundaries
 geo_hazard/          # Local hazard shapefiles/data
@@ -109,7 +109,7 @@ All use UUID PKs and `func.now()` server-default timestamps.
 
 **Geo / city-scoped**: `ZoningArea`, `Establishment`, `Alert` — FK `cities.id` (`ondelete="CASCADE"`)
 
-**Province-scoped**: `HazardArea` — FK `provinces.id` (`ondelete="CASCADE"`). NOAH dataset is province-granularity; routes accept `city_id` URL param but resolve to `province_id` internally via `hazard_area_service._province_id_for_city()`.
+**City-scoped**: `HazardArea` — FK `cities.id` (`ondelete="CASCADE"`). NOAH/faultline seeding scripts spatial-join features to city boundaries and store per-city PMTiles.
 - `ZoningArea.geometry` — PostGIS `GEOMETRY` (srid=4326)
 - `HazardArea.geometry` — PostGIS `GEOMETRY` (srid=4326); also has `hazard_type` (`flood`, `landslide`, `storm_surge`, `debris_flow`, `faultline`), `scenario` (`5yr`/`25yr`/`100yr`/`ssa1`–`ssa4`, nullable for faultlines), and `pmtile_url`
 
@@ -147,6 +147,28 @@ City-scoped routes share the `/cities` prefix in `main.py` but live in separate 
 **Public endpoints** (no auth): `GET /cities/`, `GET /subscriptions/plans`, `GET /permissions/`, `GET /roles/`, `GET /files/{file_id}`, `GET /users/` (gotcha — list all users requires no auth).
 
 **LGU invite flow** (`/users/lgu/*`): superuser-only `POST /users/lgu/invite` → sends magic-link email (24h expiry) → `GET /users/lgu/verify-invitation?token=...` → `POST /users/lgu/register`. City must be unassigned; duplicate pending invites blocked at service level.
+
+**Zoning PMTile endpoints** (in `routes/zoning_areas.py`):
+- `POST /cities/{city_id}/zoning/process-image` — runs geo-processing pipeline; request body: `{ file_id, gcps: [{pixel_x, pixel_y, lng, lat}] (≥4), n_colors: int=8, min_area_px: int=500 }`; returns `{ zones_created, skipped_zones, pmtile_url, zones[] }`
+- `GET /cities/{city_id}/zoning/pmtiles` — returns fresh 5-hour presigned URL for city's zoning PMTile (re-fetches each call)
+
+## Geo-processing pipeline
+
+`services/geo_processing_service.py` converts a georeferenced raster image (e.g., a zoning map scan) into PostGIS `ZoningArea` polygons + a city-level PMTile.
+
+**Pipeline steps** (called from `zoning_area_service.process_zoning_image`):
+1. Load image from MinIO by `file_id` via OpenCV
+2. Compute pixel→geo homography from ≥4 GCPs (`cv2.findHomography`) — raises 422 if degenerate
+3. K-means color segmentation (default 8 clusters) on 600px thumbnail; applied full-res
+4. Morphological ops (close→open) to clean masks, then `cv2.findContours` + Douglas-Peucker simplification
+5. Google Vision API OCR on full image → map text to zone contours by centroid / bounding-poly corners (deferred import, silent fallback to `[]` on any error — pipeline continues unlabeled)
+6. Transform pixel contours → Shapely polygons → validate + persist `ZoningArea` rows
+7. Generate city-level PMTile from ALL city zoning areas (new + existing) via tippecanoe
+8. Store MinIO object key on ALL `ZoningArea` rows for the city; return fresh 5-hour presigned URL
+
+**tippecanoe on Windows**: `_run_tippecanoe()` tries native binary first, then falls back to `wsl.exe` with Windows→WSL path conversion. Use `--skip-pmtiles` on Windows for seeding scripts.
+
+**Google Vision**: requires Application Default Credentials (`gcloud auth application-default login`). No `GOOGLE_APPLICATION_CREDENTIALS` env var is set in `.env` — configure ADC externally.
 
 ## Data seeding scripts
 
@@ -191,7 +213,7 @@ pmtiles/hazards/faultline/all/province-{adm2_psgc}.pmtiles
 
 **Auth flow**: JWT issued on register/login via `jwtUtils.create_jwt` (custom HS256 implementation). Decoded via `python-jose`. Set as HTTP-only cookie (`samesite=lax`). `auth_service.get_authenticated_user` accepts cookie (`ACCESS_TOKEN`) or `Authorization: Bearer <token>`. Checks `user.is_active` — inactive users get 403. New users auto-subscribed to `free` plan in same transaction as `UserRole` assignment (`user_service.py`).
 
-**Refresh token flow**: `POST /users/refresh` issues new access+refresh token pair. Refresh cookie uses `samesite=strict`, path-restricted to `/users/refresh`. For mobile clients, refresh token can also be sent in request body (cookie takes priority). Tokens stored as SHA256 hash; revoked by setting `revoked_at` (not deleted). `POST /users/logout-all` revokes all tokens for a user.
+**Refresh token flow**: `POST /users/refresh` issues new access+refresh token pair. Refresh cookie uses `samesite=strict`, path-restricted to `/users/refresh`. For mobile clients, refresh token can also be sent in request body (cookie takes priority). Tokens stored as SHA256 hash; revoked by setting `revoked_at` (not deleted). `POST /users/logout-all` revokes all tokens for a user. **Theft detection**: reuse of an already-revoked refresh token triggers immediate revocation of ALL tokens for that user + 401 "Refresh token reuse detected — all sessions revoked".
 
 **Permission enforcement**: Routes authenticate via `get_authenticated_user` but do NOT check role-permission graph at the route level. The seeded permissions exist for frontend consumption and future enforcement. Adding permission checks means reading `user.user_roles` → `role.role_permissions` manually in the service or as a new dependency.
 
@@ -229,4 +251,6 @@ analytics:view  location:save  manage:user  manage:role
 
 **HazardArea DTOs**: All route endpoints return `HazardAreaSummary` (no geometry — avoids large WKB over the wire). `HazardAreaResponse` (includes geometry) exists in `dto/HazardAreaDto.py` for future use. Apply same summary-vs-full pattern when adding new geo resources.
 
-**Hazard pmtile URLs**: `get_pmtiles_by_city` returns presigned MinIO URLs with 5-hour TTL — not static paths. Frontend must re-fetch when URLs expire.
+**Hazard pmtile URLs**: `get_pmtiles_by_city(city_id, db)` returns presigned MinIO URLs with 5-hour TTL — not static paths. Frontend must re-fetch when URLs expire. PMTile keys: `pmtiles/hazards/{hazard_type}/{scenario_slug}/city-{code}.pmtiles`.
+
+**Zoning PMTile URLs**: same presigned-URL pattern as hazards. When `process-image` runs, the MinIO object key is written to `ZoningArea.pmtile_url` for EVERY zone in the city (not just newly created ones). `GET /cities/{city_id}/zoning/pmtiles` re-signs the key on every call — the stored value is a path, not a URL.

@@ -8,14 +8,14 @@ local files required for NOAH data.
 Dataset : bettergovph/project-noah-hazard-maps (private — needs HUGGING_FACE_TOKEN in .env)
 
 Requires:
-  pip install fiona geopandas requests
+  pip install fiona geopandas httpx
 
 Usage:
   python scripts/seed_noah_hazards.py                                   # all hazards
   python scripts/seed_noah_hazards.py --hazards flood                   # flood only
   python scripts/seed_noah_hazards.py --hazards flood --scenarios 100yr # one scenario
   python scripts/seed_noah_hazards.py --skip-pmtiles                    # geometry only
-  python scripts/seed_noah_hazards.py --province Bukidnon               # one province
+  python scripts/seed_noah_hazards.py --province Bukidnon               # filter by file stem
   python scripts/seed_noah_hazards.py --workers 4                       # default: cpu_count
   python scripts/seed_noah_hazards.py --list-files                      # inspect HF repo
   python scripts/seed_noah_hazards.py --force                           # re-download existing
@@ -24,12 +24,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
-import re
 import subprocess
 import sys
 import tempfile
-import time
 import zipfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -44,18 +43,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-import requests
+import httpx
 import sqlalchemy as sa
 from geoalchemy2.shape import from_shape
-from requests.adapters import HTTPAdapter
 from sqlalchemy.orm import Session
-from urllib3.util.retry import Retry
 
 from core.db import SessionLocal
 from core.minio_client import minio_client, BUCKET_NAME
 import models  # noqa: F401
 from models.city import City
-from models.province import Province
 from models.hazard_area import HazardArea
 
 # ---------------------------------------------------------------------------
@@ -69,6 +65,7 @@ HF_REPO_ID     = "bettergovph/project-noah-hazard-maps"
 
 _DOWNLOAD_MAX_ATTEMPTS = 5
 _DOWNLOAD_CHUNK_SIZE   = 1 << 20  # 1 MiB
+_DL_CONCURRENCY        = 4        # concurrent ZIP downloads
 
 # HF directory prefix → (hazard_type, scenario, is_national_file, local_subdir)
 HF_SOURCE_MAP: dict[str, tuple[str, Optional[str], bool, str]] = {
@@ -105,12 +102,9 @@ SCENARIO_FILTER_MAP: dict[str, list[str]] = {
     "ssa4": ["Storm Surge/StormSurgeAdvisory4"],
 }
 
-# Filename-stem → province-name overrides for unresolvable names.
-STEM_OVERRIDES: dict[str, str] = {}
-
 
 # ---------------------------------------------------------------------------
-# HTTP session
+# Auth
 # ---------------------------------------------------------------------------
 
 def get_hf_token() -> str:
@@ -121,22 +115,8 @@ def get_hf_token() -> str:
     return token
 
 
-def make_session(token: str) -> requests.Session:
-    session = requests.Session()
-    session.headers["Authorization"] = f"Bearer {token}"
-    retry = Retry(
-        total=5,
-        backoff_factor=2,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET"],
-        raise_on_status=False,
-    )
-    session.mount("https://", HTTPAdapter(max_retries=retry))
-    return session
-
-
 # ---------------------------------------------------------------------------
-# HuggingFace API
+# HuggingFace API (async)
 # ---------------------------------------------------------------------------
 
 def _parse_next_url(link_header: str) -> Optional[str]:
@@ -147,28 +127,28 @@ def _parse_next_url(link_header: str) -> Optional[str]:
     return None
 
 
-def list_zips_for_prefix(hf_prefix: str, session: requests.Session) -> list[str]:
+async def _list_zips_for_prefix(client: httpx.AsyncClient, hf_prefix: str) -> list[str]:
     """List all .zip paths under hf_prefix via the HF datasets tree API."""
     encoded = quote(hf_prefix, safe="/")
     url: Optional[str] = f"{HF_BASE}/api/datasets/{HF_REPO_ID}/tree/main/{encoded}"
     result: list[str] = []
     while url:
-        resp = session.get(url, timeout=30)
+        resp = await client.get(url, timeout=30)
         if resp.status_code == 404:
             break
         resp.raise_for_status()
         for item in resp.json():
             if item.get("type") == "file" and item["path"].endswith(".zip"):
                 result.append(item["path"])
-        url = _parse_next_url(resp.headers.get("Link", ""))
+        url = _parse_next_url(resp.headers.get("link", ""))
     return result
 
 
 # ---------------------------------------------------------------------------
-# Download + convert
+# Download + convert (async)
 # ---------------------------------------------------------------------------
 
-def _download_file(hf_path: str, dest: Path, session: requests.Session) -> None:
+async def _download_file_async(client: httpx.AsyncClient, hf_path: str, dest: Path) -> None:
     """Stream-download with retry; writes to .part then renames on success."""
     url = f"{HF_BASE}/datasets/{HF_REPO_ID}/resolve/main/{quote(hf_path, safe='/')}"
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -176,15 +156,14 @@ def _download_file(hf_path: str, dest: Path, session: requests.Session) -> None:
 
     for attempt in range(1, _DOWNLOAD_MAX_ATTEMPTS + 1):
         try:
-            with session.get(url, stream=True, timeout=300) as resp:
+            async with client.stream("GET", url, timeout=300) as resp:
                 resp.raise_for_status()
-                total = int(resp.headers.get("Content-Length", 0))
+                total = int(resp.headers.get("content-length", 0))
                 downloaded = 0
                 with open(tmp, "wb") as fh:
-                    for chunk in resp.iter_content(chunk_size=_DOWNLOAD_CHUNK_SIZE):
-                        if chunk:
-                            fh.write(chunk)
-                            downloaded += len(chunk)
+                    async for chunk in resp.aiter_bytes(_DOWNLOAD_CHUNK_SIZE):
+                        fh.write(chunk)
+                        downloaded += len(chunk)
             if total and downloaded < total:
                 raise IOError(f"incomplete: got {downloaded}/{total} bytes")
             tmp.rename(dest)
@@ -197,7 +176,7 @@ def _download_file(hf_path: str, dest: Path, session: requests.Session) -> None:
                 ) from exc
             wait = 2 ** attempt
             print(f"    attempt {attempt} failed ({exc}), retrying in {wait}s…", flush=True)
-            time.sleep(wait)
+            await asyncio.sleep(wait)
 
 
 def _zip_to_geojson(zip_path: Path, out_path: Path) -> bool:
@@ -232,97 +211,54 @@ def _zip_to_geojson(zip_path: Path, out_path: Path) -> bool:
         return True
 
 
-def _download_and_convert(
-    hf_path: str, out_path: Path, session: requests.Session, force: bool = False
+async def _download_and_convert_async(
+    client: httpx.AsyncClient,
+    sem: asyncio.Semaphore,
+    hf_path: str,
+    out_path: Path,
+    force: bool = False,
 ) -> Optional[Path]:
     """Download HF ZIP and convert to GeoJSON. Skips if already exists unless force=True."""
     if out_path.exists() and not force:
         return out_path
-    with tempfile.TemporaryDirectory() as tmp:
-        zip_dest = Path(tmp) / Path(hf_path).name
-        try:
-            _download_file(hf_path, zip_dest, session)
-        except Exception as exc:
-            print(f"    download failed: {exc}", flush=True)
-            return None
-        if _zip_to_geojson(zip_dest, out_path):
-            return out_path
-        return None
+    async with sem:
+        with tempfile.TemporaryDirectory() as tmp:
+            zip_dest = Path(tmp) / Path(hf_path).name
+            try:
+                await _download_file_async(client, hf_path, zip_dest)
+            except Exception as exc:
+                print(f"    download failed: {exc}", flush=True)
+                return None
+            success = await asyncio.to_thread(_zip_to_geojson, zip_dest, out_path)
+            return out_path if success else None
 
 
 # ---------------------------------------------------------------------------
-# Province index
+# City index
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ProvinceInfo:
+class CityInfo:
     id:   str
     name: str
     code: Optional[str]
 
 
-def _norm(s: str) -> str:
-    return re.sub(r"[\s\-.–—_']", "", s).lower()
-
-
-def build_indexes(db: Session) -> tuple[
-    dict[str, ProvinceInfo],
-    dict[str, ProvinceInfo],
-    dict[str, ProvinceInfo],
-]:
-    provinces = db.query(Province).all()
-    name_index: dict[str, ProvinceInfo] = {}
-    id_index:   dict[str, ProvinceInfo] = {}
-    for p in provinces:
-        info = ProvinceInfo(id=str(p.id), name=str(p.name), code=str(p.code) if p.code else None)
-        name_index[_norm(p.name)] = info
-        id_index[str(p.id)]       = info
-
-    city_index: dict[str, ProvinceInfo] = {}
-    for c in db.query(City).filter(City.province_id.isnot(None)).all():
-        prov = id_index.get(str(c.province_id))
-        if prov:
-            city_index[_norm(c.name)] = prov
-
-    return name_index, id_index, city_index
-
-
-def match_province(
-    stem: str,
-    name_index: dict[str, ProvinceInfo],
-    city_index: dict[str, ProvinceInfo],
-) -> Optional[ProvinceInfo]:
-    normalized = STEM_OVERRIDES.get(_norm(stem), _norm(stem))
-    if normalized in name_index:
-        return name_index[normalized]
-    for key, p in name_index.items():
-        if normalized in key or key in normalized:
-            return p
-    if normalized in city_index:
-        return city_index[normalized]
-    for key, p in city_index.items():
-        if normalized in key or key in normalized:
-            return p
-    return None
-
-
-def build_provinces_gdf(db: Session) -> tuple:
+def build_cities_gdf(db: Session) -> tuple:
     import geopandas as gpd
     from geoalchemy2.shape import to_shape
 
     ids, geoms, infos = [], [], {}
-    for p in db.query(Province).all():
-        if p.boundary is None:
-            continue
+    for c in db.query(City).filter(City.boundary.isnot(None)).all():
         try:
-            info = ProvinceInfo(id=str(p.id), name=str(p.name), code=str(p.code) if p.code else None)
-            ids.append(str(p.id))
-            geoms.append(to_shape(p.boundary))
-            infos[str(p.id)] = info
+            info = CityInfo(id=str(c.id), name=str(c.name), code=str(c.code) if c.code else None)
+            ids.append(str(c.id))
+            geoms.append(to_shape(c.boundary))
+            infos[str(c.id)] = info
         except Exception:
             pass
 
-    gdf = gpd.GeoDataFrame({"province_id_ref": ids}, geometry=geoms, crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame({"city_id_ref": ids}, geometry=geoms, crs="EPSG:4326")
     return gdf.reset_index(drop=True), infos
 
 
@@ -386,13 +322,13 @@ def generate_pmtiles(geojson_path: Path, minio_key: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def _replace_features(
-    province_id: str,
+    city_id:     str,
     hazard_type: str,
     scenario:    Optional[str],
     pmtile_url:  Optional[str],
     wkbs:        list,
 ) -> int:
-    """Delete existing rows for (province, hazard_type, scenario) then bulk insert."""
+    """Delete existing rows for (city, hazard_type, scenario) then bulk insert."""
     if not wkbs:
         return 0
     from uuid import uuid4
@@ -403,7 +339,7 @@ def _replace_features(
         db.execute(
             sa.delete(HazardArea).where(
                 sa.and_(
-                    HazardArea.province_id == province_id,
+                    HazardArea.city_id == city_id,
                     HazardArea.hazard_type == hazard_type,
                     scenario_clause,
                 )
@@ -414,7 +350,7 @@ def _replace_features(
             [
                 {
                     "id":          str(uuid4()),
-                    "province_id": province_id,
+                    "city_id":     city_id,
                     "hazard_type": hazard_type,
                     "scenario":    scenario,
                     "pmtile_url":  pmtile_url,
@@ -428,62 +364,90 @@ def _replace_features(
 
 
 # ---------------------------------------------------------------------------
-# Per-province worker — top-level for ProcessPoolExecutor pickling
+# Per-file worker — top-level for ProcessPoolExecutor pickling
 # ---------------------------------------------------------------------------
 
-def _worker(task: dict) -> tuple[str, str, int]:
+def _worker(task: dict) -> tuple[str, int]:
     """
-    Read one province GeoJSON, store each feature as a HazardArea row.
-    Returns (stem, province_name, rows_inserted).
+    Read one hazard GeoJSON, spatial-join with city boundaries,
+    generate per-city PMTiles, and insert HazardArea rows.
     """
     import geopandas as gpd
 
     os.environ["OGR_GEOJSON_MAX_OBJ_SIZE"] = "0"
 
     geojson_path: Path          = task["path"]
-    province:     ProvinceInfo  = task["province"]
     hazard_type:  str           = task["hazard_type"]
     scenario:     Optional[str] = task["scenario"]
     skip_pmtiles: bool          = task["skip_pmtiles"]
 
     stem = geojson_path.stem
-
-    pmtile_url = None
-    if not skip_pmtiles and province.code:
-        scenario_slug = scenario or "all"
-        minio_key = f"pmtiles/hazards/{hazard_type}/{scenario_slug}/province-{province.code}.pmtiles"
-        pmtile_url = generate_pmtiles(geojson_path, minio_key)
+    total = 0
 
     try:
         gdf = gpd.read_file(str(geojson_path))
     except Exception as exc:
         print(f"    [{stem}] read failed: {exc}", flush=True)
-        return stem, province.name, 0
+        return stem, 0
 
     if gdf.empty:
-        return stem, province.name, 0
+        return stem, 0
 
     if gdf.crs is None:
         gdf = gdf.set_crs("EPSG:4326")
     elif gdf.crs.to_epsg() != 4326:
         gdf = gdf.to_crs("EPSG:4326")
 
-    wkbs = [w for g in gdf.geometry if (w := _geom_to_wkb(g)) is not None]
-    count = _replace_features(province.id, hazard_type, scenario, pmtile_url, wkbs)
-    return stem, province.name, count
+    with SessionLocal() as db:
+        cities_gdf, city_infos = build_cities_gdf(db)
+
+    if cities_gdf.empty:
+        return stem, 0
+
+    joined = gpd.sjoin(
+        gdf[["geometry"]], cities_gdf[["city_id_ref", "geometry"]],
+        how="inner", predicate="intersects",
+    )
+    joined = joined[~joined.index.duplicated(keep="first")]
+    joined = joined[joined["city_id_ref"].notna()]
+
+    if joined.empty:
+        return stem, 0
+
+    scenario_slug = scenario or "all"
+    for city_id_str, group in joined.groupby("city_id_ref"):
+        city = city_infos.get(str(city_id_str))
+        if not city or not city.code:
+            continue
+
+        pmtile_url = None
+        if not skip_pmtiles:
+            minio_key = f"pmtiles/hazards/{hazard_type}/{scenario_slug}/city-{city.code}.pmtiles"
+            with tempfile.TemporaryDirectory() as tmp:
+                slice_path = Path(tmp) / "slice.geojson"
+                group[["geometry"]].to_file(str(slice_path), driver="GeoJSON")
+                pmtile_url = generate_pmtiles(slice_path, minio_key)
+
+        wkbs = [w for g in group.geometry if (w := _geom_to_wkb(g)) is not None]
+        count = _replace_features(city.id, hazard_type, scenario, pmtile_url, wkbs)
+        total += count
+
+    n_cities = joined["city_id_ref"].nunique()
+    print(f"    [{stem}] {total} rows across {n_cities} cities", flush=True)
+    return stem, total
 
 
 # ---------------------------------------------------------------------------
-# National file worker (spatial-join → per-province bulk insert)
+# National file handler (spatial-join → per-city bulk insert)
 # ---------------------------------------------------------------------------
 
 def _process_national(
-    geojson_path:   Path,
-    hazard_type:    str,
-    scenario:       Optional[str],
-    provinces_gdf,
-    province_infos: dict[str, ProvinceInfo],
-    skip_pmtiles:   bool,
+    geojson_path:  Path,
+    hazard_type:   str,
+    scenario:      Optional[str],
+    cities_gdf,
+    city_infos:    dict[str, CityInfo],
+    skip_pmtiles:  bool,
 ) -> None:
     import geopandas as gpd
 
@@ -504,24 +468,24 @@ def _process_national(
         gdf = gdf.to_crs("EPSG:4326")
 
     joined = gpd.sjoin(
-        gdf, provinces_gdf[["province_id_ref", "geometry"]],
+        gdf, cities_gdf[["city_id_ref", "geometry"]],
         how="left", predicate="intersects",
     )
     joined = joined[~joined.index.duplicated(keep="first")]
-    joined = joined[joined["province_id_ref"].notna()]
+    joined = joined[joined["city_id_ref"].notna()]
     if joined.empty:
-        print(f"    no features intersect any province", flush=True)
+        print("    no features intersect any city", flush=True)
         return
 
     scenario_slug = scenario or "all"
-    for prov_id_str, group in joined.groupby("province_id_ref"):
-        province = province_infos.get(str(prov_id_str))
-        if not province or not province.code:
+    for city_id_str, group in joined.groupby("city_id_ref"):
+        city = city_infos.get(str(city_id_str))
+        if not city or not city.code:
             continue
 
         pmtile_url = None
         if not skip_pmtiles:
-            minio_key = f"pmtiles/hazards/{hazard_type}/{scenario_slug}/province-{province.code}.pmtiles"
+            minio_key = f"pmtiles/hazards/{hazard_type}/{scenario_slug}/city-{city.code}.pmtiles"
             with tempfile.TemporaryDirectory() as tmp:
                 slice_path = Path(tmp) / "slice.geojson"
                 cols = [c for c in group.columns if not c.startswith("index_")]
@@ -529,8 +493,8 @@ def _process_national(
                 pmtile_url = generate_pmtiles(slice_path, minio_key)
 
         wkbs = [w for g in group.geometry if (w := _geom_to_wkb(g)) is not None]
-        count = _replace_features(province.id, hazard_type, scenario, pmtile_url, wkbs)
-        print(f"    [{province.name}] {count} rows", flush=True)
+        count = _replace_features(city.id, hazard_type, scenario, pmtile_url, wkbs)
+        print(f"    [{city.name}] {count} rows", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -562,16 +526,14 @@ def _build_allowed_prefixes(
 
 
 def seed_hazard_source(
-    hazard_type:     str,
-    scenario:        Optional[str],
-    geojsons:        list[Path],
-    is_national:     bool,
-    name_index:      dict[str, ProvinceInfo],
-    city_index:      dict[str, ProvinceInfo],
-    provinces_gdf,
-    province_infos:  dict[str, ProvinceInfo],
-    skip_pmtiles:    bool,
-    workers:         int,
+    hazard_type:    str,
+    scenario:       Optional[str],
+    geojsons:       list[Path],
+    is_national:    bool,
+    cities_gdf,
+    city_infos:     dict[str, CityInfo],
+    skip_pmtiles:   bool,
+    workers:        int,
     province_filter: Optional[str],
 ) -> None:
     if province_filter:
@@ -586,22 +548,18 @@ def seed_hazard_source(
 
     if is_national:
         for gj in geojsons:
-            _process_national(gj, hazard_type, scenario, provinces_gdf, province_infos, skip_pmtiles)
+            _process_national(gj, hazard_type, scenario, cities_gdf, city_infos, skip_pmtiles)
         return
 
-    tasks = []
-    for gj in geojsons:
-        province = match_province(gj.stem, name_index, city_index)
-        if not province:
-            print(f"  [{gj.stem}] no matching province — add to STEM_OVERRIDES if needed", flush=True)
-            continue
-        tasks.append({
+    tasks = [
+        {
             "path":         gj,
-            "province":     province,
             "hazard_type":  hazard_type,
             "scenario":     scenario,
             "skip_pmtiles": skip_pmtiles,
-        })
+        }
+        for gj in geojsons
+    ]
 
     total = len(tasks)
     done  = 0
@@ -610,11 +568,114 @@ def seed_hazard_source(
         for fut in as_completed(futures):
             done += 1
             try:
-                stem, prov_name, count = fut.result()
-                print(f"  [{done}/{total}] {stem} → {prov_name}  ({count} rows)", flush=True)
+                stem, count = fut.result()
+                print(f"  [{done}/{total}] {stem}  ({count} rows)", flush=True)
             except Exception as exc:
                 t = futures[fut]
                 print(f"  [{done}/{total}] {t['path'].stem}  error: {exc}", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Async entry point
+# ---------------------------------------------------------------------------
+
+async def _async_run(
+    hazard_filter:   Optional[list[str]],
+    scenario_filter: Optional[list[str]],
+    skip_pmtiles:    bool,
+    province_filter: Optional[str],
+    workers:         int,
+    list_files_only: bool,
+    force:           bool,
+) -> None:
+    token = get_hf_token()
+    limits = httpx.Limits(
+        max_connections=_DL_CONCURRENCY + 4,
+        max_keepalive_connections=_DL_CONCURRENCY,
+    )
+    transport = httpx.AsyncHTTPTransport(retries=3)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async with httpx.AsyncClient(
+        limits=limits,
+        transport=transport,
+        headers=headers,
+        follow_redirects=True,
+    ) as client:
+        if list_files_only:
+            print(f"Listing files in {HF_REPO_ID}…", flush=True)
+            prefixes = list(HF_SOURCE_MAP.keys())
+            all_zips = await asyncio.gather(*[_list_zips_for_prefix(client, p) for p in prefixes])
+            for prefix, zips in zip(prefixes, all_zips):
+                print(f"\n[{prefix}] {len(zips)} ZIP(s)")
+                for z in sorted(zips):
+                    print(f"  {z}")
+            return
+
+        allowed = _build_allowed_prefixes(hazard_filter, scenario_filter)
+        if not allowed:
+            print("No matching sources for the given filters.")
+            return
+
+        print("\n" + "=" * 55)
+        print("  Building city boundary index from DB…")
+        print("=" * 55)
+        with SessionLocal() as db:
+            cities_gdf, city_infos = build_cities_gdf(db)
+        print(f"  {len(cities_gdf)} cities with boundary geometry")
+
+        allowed_prefixes = [p for p in HF_SOURCE_MAP if p in allowed]
+
+        # List all allowed prefixes concurrently (fast metadata calls)
+        print(f"\n  Listing {len(allowed_prefixes)} source(s) concurrently…", flush=True)
+        all_zips_lists = await asyncio.gather(*[
+            _list_zips_for_prefix(client, p) for p in allowed_prefixes
+        ])
+
+        sem = asyncio.Semaphore(_DL_CONCURRENCY)
+
+        for hf_prefix, zips in zip(allowed_prefixes, all_zips_lists):
+            hazard_type, scenario, is_national, local_subdir = HF_SOURCE_MAP[hf_prefix]
+
+            print(f"\n{'=' * 55}")
+            print(f"  {hazard_type.upper()} / {scenario or 'all'}")
+            print(f"{'=' * 55}")
+
+            if not zips:
+                print("  no ZIPs found (run --list-files to inspect repo structure)", flush=True)
+                continue
+            print(f"  {len(zips)} ZIP(s) found", flush=True)
+
+            prefix_dir = GEO_HAZARD_DIR / local_subdir
+            prefix_dir.mkdir(parents=True, exist_ok=True)
+
+            sorted_zips = sorted(zips)
+            total = len(sorted_zips)
+
+            async def _dl(hf_path: str) -> tuple[str, Optional[Path]]:
+                stem = Path(hf_path).stem
+                out = prefix_dir / f"{stem}.geojson"
+                result = await _download_and_convert_async(client, sem, hf_path, out, force)
+                return stem, result
+
+            geojsons: list[Path] = []
+            done = 0
+            for coro in asyncio.as_completed([_dl(z) for z in sorted_zips]):
+                stem, result = await coro
+                done += 1
+                print(f"  [{done}/{total}] {stem}  {'✓' if result else '✗'}", flush=True)
+                if result:
+                    geojsons.append(result)
+
+            # seed_hazard_source is blocking (ProcessPoolExecutor) — run in thread
+            await asyncio.to_thread(
+                seed_hazard_source,
+                hazard_type, scenario, geojsons, is_national,
+                cities_gdf, city_infos,
+                skip_pmtiles, workers, province_filter,
+            )
+
+    print("\nAll done.")
 
 
 # ---------------------------------------------------------------------------
@@ -638,70 +699,10 @@ def run(
         )
         sys.exit(1)
 
-    token   = get_hf_token()
-    session = make_session(token)
-
-    if list_files_only:
-        print(f"Listing files in {HF_REPO_ID}…", flush=True)
-        for prefix in HF_SOURCE_MAP:
-            zips = list_zips_for_prefix(prefix, session)
-            print(f"\n[{prefix}] {len(zips)} ZIP(s)")
-            for z in sorted(zips):
-                print(f"  {z}")
-        return
-
-    allowed = _build_allowed_prefixes(hazard_filter, scenario_filter)
-    if not allowed:
-        print("No matching sources for the given filters.")
-        return
-
-    print("\n" + "=" * 55)
-    print("  Building province + city index from DB…")
-    print("=" * 55)
-    with SessionLocal() as db:
-        name_index, id_index, city_index = build_indexes(db)
-        print(f"  {len(name_index)} provinces, {len(city_index)} cities indexed")
-        provinces_gdf, province_infos = build_provinces_gdf(db)
-        print(f"  {len(provinces_gdf)} provinces with geometry")
-
-    for hf_prefix, (hazard_type, scenario, is_national, local_subdir) in HF_SOURCE_MAP.items():
-        if hf_prefix not in allowed:
-            continue
-
-        print(f"\n{'=' * 55}")
-        print(f"  {hazard_type.upper()} / {scenario or 'all'}")
-        print(f"{'=' * 55}")
-
-        print(f"  Listing {hf_prefix}…", flush=True)
-        zips = list_zips_for_prefix(hf_prefix, session)
-        if not zips:
-            print(f"  no ZIPs found (run --list-files to inspect repo structure)", flush=True)
-            continue
-        print(f"  {len(zips)} ZIP(s) found", flush=True)
-
-        prefix_dir = GEO_HAZARD_DIR / local_subdir
-        prefix_dir.mkdir(parents=True, exist_ok=True)
-
-        geojsons: list[Path] = []
-        for i, hf_path in enumerate(sorted(zips), 1):
-            stem     = Path(hf_path).stem
-            out_path = prefix_dir / f"{stem}.geojson"
-            cached   = out_path.exists() and not force
-            print(f"  [{i}/{len(zips)}] {stem}{'  [cached]' if cached else '…'}", end=" ", flush=True)
-            result = _download_and_convert(hf_path, out_path, session, force=force)
-            if result:
-                geojsons.append(result)
-                print("✓", flush=True)
-            else:
-                print("✗", flush=True)
-
-        seed_hazard_source(
-            hazard_type, scenario, geojsons, is_national,
-            name_index, city_index, provinces_gdf, province_infos,
-            skip_pmtiles, workers, province_filter,
-        )
-
-    print("\nAll done.")
+    asyncio.run(_async_run(
+        hazard_filter, scenario_filter, skip_pmtiles,
+        province_filter, workers, list_files_only, force,
+    ))
 
 
 if __name__ == "__main__":
@@ -717,7 +718,8 @@ if __name__ == "__main__":
     parser.add_argument("--scenarios",    nargs="+", default=None, metavar="SCENARIO",
                         help="5yr 25yr 100yr ssa1 ssa2 ssa3 ssa4")
     parser.add_argument("--skip-pmtiles", action="store_true")
-    parser.add_argument("--province",     default=None, metavar="NAME")
+    parser.add_argument("--province",     default=None, metavar="NAME",
+                        help="Filter by file stem (NOAH files are named after provinces)")
     parser.add_argument("--list-files",   action="store_true",
                         help="Print all ZIP paths in the HF repo and exit")
     parser.add_argument("--force",        action="store_true",

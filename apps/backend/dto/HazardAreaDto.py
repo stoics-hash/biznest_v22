@@ -21,7 +21,7 @@ class HazardAreaSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id:          UUID
-    province_id: UUID
+    city_id: UUID
     hazard_type: str | None
     scenario:    str | None
     pmtile_url:  str | None
@@ -33,7 +33,7 @@ class HazardAreaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id:          UUID
-    province_id: UUID
+    city_id: UUID
     hazard_type: str | None
     scenario:    str | None
     pmtile_url:  str | None

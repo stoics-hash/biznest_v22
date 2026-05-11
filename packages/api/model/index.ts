@@ -39,7 +39,7 @@ export * from './lguInviteRequest';
 export * from './lguInviteResponse';
 export * from './lguRegisterRequest';
 export * from './listAuditLogsAuditLogsGetParams';
-export * from './listHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams';
+export * from './listHazardPmtilesCitiesCityIdHazardsPmtilesGetParams';
 export * from './loginRequest';
 export * from './logoutRequest';
 export * from './permissionCreate';
