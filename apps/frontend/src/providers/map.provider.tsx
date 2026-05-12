@@ -41,8 +41,15 @@ export function MapProvider({ children }: PropsWithChildren) {
   const [show3D, setShow3D] = useState(true)
   const [hazardLayers, setHazardLayersState] = useState<HazardTile[]>([])
   const [visibleHazardKeys, setVisibleHazardKeys] = useState<Set<string>>(new Set())
+  const [showAllHazards, setShowAllHazards] = useState(() => {
+    const s = localStorage.getItem('biznest:show_all_hazards')
+    return s === null ? true : s === 'true'
+  })
   const [zoningTile, setZoningTile] = useState<{ url: string; sourceLayer: string } | null>(null)
-  const [showZoning, setShowZoning] = useState(true)
+  const [showZoning, setShowZoning] = useState(() => {
+    const s = localStorage.getItem('biznest:show_zoning')
+    return s === null ? true : s === 'true'
+  })
   const [visibleZoningTypes, setVisibleZoningTypes] = useState<Set<string> | null>(null)
   const [clickedZone, setClickedZone] = useState<ClickedZone | null>(null)
 
@@ -53,6 +60,11 @@ export function MapProvider({ children }: PropsWithChildren) {
   showZoningRef.current = showZoning
   const visibleZoningTypesRef = useRef(visibleZoningTypes)
   visibleZoningTypesRef.current = visibleZoningTypes
+
+  // ── Persist visibility toggles ────────────────────────────────────────────
+
+  useEffect(() => { localStorage.setItem('biznest:show_zoning', String(showZoning)) }, [showZoning])
+  useEffect(() => { localStorage.setItem('biznest:show_all_hazards', String(showAllHazards)) }, [showAllHazards])
 
   // ── Light preset ─────────────────────────────────────────────────────────
 
@@ -172,14 +184,15 @@ export function MapProvider({ children }: PropsWithChildren) {
   }, [engine, hazardLayers])
 
   // ── Sync visibility state → engine ───────────────────────────────────────
+  // showAllHazards acts as master switch; visibleHazardKeys preserves individual selections.
 
   useEffect(() => {
     if (!engine) return
     for (const tile of hazardLayers) {
       const key = engine.hazardKey(tile)
-      engine.setHazardLayerVisible(key, visibleHazardKeys.has(key))
+      engine.setHazardLayerVisible(key, showAllHazards && visibleHazardKeys.has(key))
     }
-  }, [engine, hazardLayers, visibleHazardKeys])
+  }, [engine, hazardLayers, visibleHazardKeys, showAllHazards])
 
   // ── Toggle ────────────────────────────────────────────────────────────────
 
@@ -198,6 +211,14 @@ export function MapProvider({ children }: PropsWithChildren) {
     if (!engine) return
     engine.setZoningTypeFilter(visibleZoningTypes === null ? null : [...visibleZoningTypes])
   }, [engine, visibleZoningTypes])
+
+  const resetZoningTypes = useCallback(() => {
+    setVisibleZoningTypes(null)
+  }, [])
+
+  const resetHazardVisibility = useCallback(() => {
+    setVisibleHazardKeys(new Set(hazardLayers.map(t => `${t.hazard_type}::${t.scenario ?? 'all'}`)))
+  }, [hazardLayers])
 
   const toggleZoningType = useCallback((type: string, allTypes: string[]) => {
     setVisibleZoningTypes(prev => {
@@ -234,11 +255,15 @@ export function MapProvider({ children }: PropsWithChildren) {
       hazardLayers,
       visibleHazardKeys,
       toggleHazard,
+      showAllHazards,
+      setShowAllHazards,
       zoningPmtileUrl: zoningTile?.url ?? null,
       showZoning,
       setShowZoning,
       visibleZoningTypes,
       toggleZoningType,
+      resetZoningTypes,
+      resetHazardVisibility,
       clickedZone,
       setClickedZone,
       refreshZoningLayer,

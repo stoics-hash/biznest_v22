@@ -22,6 +22,9 @@ export interface MapData {
   visibleHazardKeys: Set<string>
   /** Toggle a single hazard layer on or off by its key. */
   toggleHazard: (key: string) => void
+  /** Master switch — when false all hazard layers hidden; individual visibleHazardKeys preserved. */
+  showAllHazards: boolean
+  setShowAllHazards: (v: boolean) => void
   /** Presigned MinIO URL for the city zoning PMTile (5-hour TTL). Null = no zoning data. */
   zoningPmtileUrl: string | null
   showZoning: boolean
@@ -30,6 +33,10 @@ export interface MapData {
   visibleZoningTypes: Set<string> | null
   /** Toggle one zone_type. allTypes = full list of known types for this city. */
   toggleZoningType: (type: string, allTypes: string[]) => void
+  /** Reset zone type filter to null (all visible). */
+  resetZoningTypes: () => void
+  /** Restore all hazard keys to visible (undo all individual hide toggles). */
+  resetHazardVisibility: () => void
   /** Zone feature clicked on the map. null = no selection. */
   clickedZone: ClickedZone | null
   setClickedZone: (zone: ClickedZone | null) => void
@@ -47,11 +54,15 @@ export const MapContext = createContext<MapData>({
   hazardLayers: [],
   visibleHazardKeys: new Set(),
   toggleHazard: () => {},
+  showAllHazards: true,
+  setShowAllHazards: () => {},
   zoningPmtileUrl: null,
   showZoning: true,
   setShowZoning: () => {},
   visibleZoningTypes: null,
   toggleZoningType: () => {},
+  resetZoningTypes: () => {},
+  resetHazardVisibility: () => {},
   clickedZone: null,
   setClickedZone: () => {},
   refreshZoningLayer: async () => {},

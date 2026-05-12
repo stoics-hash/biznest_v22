@@ -1,7 +1,9 @@
+import json
 from datetime import timedelta
 from uuid import UUID
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.minio_client import BUCKET_NAME, minio_client
@@ -76,3 +78,50 @@ def delete(hazard_id: UUID, city_id: UUID, db: Session) -> None:
     hazard = get_or_404(hazard_id, city_id, db)
     db.delete(hazard)
     db.commit()
+
+
+def get_geojson(
+    city_id: UUID,
+    db: Session,
+    bbox: str | None = None,
+    hazard_type: str | None = None,
+    scenario: str | None = None,
+) -> dict:
+    """
+    Return a GeoJSON FeatureCollection of hazard areas for a city.
+    Filters: bbox='minLng,minLat,maxLng,maxLat', hazard_type, scenario.
+    Geometry serialized by PostGIS (ST_AsGeoJSON) — no Shapely roundtrip.
+    """
+    q = db.query(
+        HazardArea.id,
+        HazardArea.hazard_type,
+        HazardArea.scenario,
+        func.ST_AsGeoJSON(HazardArea.geometry).label("geojson"),
+    ).filter(HazardArea.city_id == city_id, HazardArea.geometry.isnot(None))
+
+    if hazard_type:
+        q = q.filter(HazardArea.hazard_type == hazard_type)
+    if scenario:
+        q = q.filter(HazardArea.scenario == scenario)
+    if bbox:
+        try:
+            min_lng, min_lat, max_lng, max_lat = (float(v.strip()) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="bbox must be 'minLng,minLat,maxLng,maxLat'")
+        envelope = func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
+        q = q.filter(func.ST_Intersects(HazardArea.geometry, envelope))
+
+    features = [
+        {
+            "type": "Feature",
+            "id": str(row.id),
+            "geometry": json.loads(row.geojson),
+            "properties": {
+                "id": str(row.id),
+                "hazard_type": row.hazard_type,
+                "scenario": row.scenario,
+            },
+        }
+        for row in q.all()
+    ]
+    return {"type": "FeatureCollection", "features": features}

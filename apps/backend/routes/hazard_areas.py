@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from dto.HazardAreaDto import HazardAreaCreate, HazardAreaResponse, HazardAreaSummary, HazardAreaUpdate, HazardPmtileResponse
@@ -35,6 +36,20 @@ def create_hazard_area(
     current_user: User = Depends(get_authenticated_user),
 ):
     return hazard_area_service.create(city_id, payload, current_user.id, db)
+
+
+@router.get("/{city_id}/hazards/geojson", summary="GeoJSON FeatureCollection for Turf.js")
+def get_hazard_geojson(
+    city_id: UUID,
+    bbox: str | None = Query(None, description="minLng,minLat,maxLng,maxLat — spatial filter"),
+    hazard_type: str | None = Query(default=None, description="flood | landslide | storm_surge | debris_flow | faultline"),
+    scenario: str | None = Query(default=None, description="5yr | 25yr | 100yr | ssa1-ssa4"),
+    db: Session = Depends(get_db),
+):
+    return JSONResponse(
+        content=hazard_area_service.get_geojson(city_id, db, bbox, hazard_type, scenario),
+        media_type="application/geo+json",
+    )
 
 
 @router.get("/{city_id}/hazards/{hazard_id}", response_model=HazardAreaSummary)

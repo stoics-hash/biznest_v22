@@ -1,8 +1,10 @@
+import json
 from uuid import UUID
 
 from fastapi import HTTPException
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import mapping
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from dto.ZoningAreaDto import (
@@ -266,6 +268,43 @@ def regenerate_pmtile(city_id: UUID, db: Session) -> ZoningPmtilesResponse:
         pmtile_url=gps.presign_pmtile(object_key),
         object_key=object_key,
     )
+
+
+def get_geojson(city_id: UUID, db: Session, bbox: str | None = None) -> dict:
+    """
+    Return a GeoJSON FeatureCollection of all zoning areas for a city.
+    Optional bbox='minLng,minLat,maxLng,maxLat' spatially filters via PostGIS ST_Intersects.
+    Geometry is serialized by PostGIS (ST_AsGeoJSON) — no Shapely roundtrip.
+    """
+    q = db.query(
+        ZoningArea.id,
+        ZoningArea.zone_type,
+        ZoningArea.color_hex,
+        func.ST_AsGeoJSON(ZoningArea.geometry).label("geojson"),
+    ).filter(ZoningArea.city_id == city_id, ZoningArea.geometry.isnot(None))
+
+    if bbox:
+        try:
+            min_lng, min_lat, max_lng, max_lat = (float(v.strip()) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="bbox must be 'minLng,minLat,maxLng,maxLat'")
+        envelope = func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
+        q = q.filter(func.ST_Intersects(ZoningArea.geometry, envelope))
+
+    features = [
+        {
+            "type": "Feature",
+            "id": str(row.id),
+            "geometry": json.loads(row.geojson),
+            "properties": {
+                "id": str(row.id),
+                "zone_type": row.zone_type,
+                "color_hex": row.color_hex,
+            },
+        }
+        for row in q.all()
+    ]
+    return {"type": "FeatureCollection", "features": features}
 
 
 def get_city_pmtile_url(city_id: UUID, db: Session) -> ZoningPmtilesResponse:

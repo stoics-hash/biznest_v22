@@ -55,12 +55,15 @@ export function useCitySetup() {
   const atLimit = maxCities !== null && myCityIds.length >= maxCities
 
   async function enterCity(city: CityResponse) {
-    // Fetch with geometry so MapProvider can fly to + draw the boundary
-    const fullCity = await getCityCitiesCityIdGet(city.id)
-      .then(r => r.data)
-      .catch(() => city) // fallback to geometry-less city if fetch fails
+    const [fullCity] = await Promise.all([
+      getCityCitiesCityIdGet(city.id, { include_geometry: true })
+        .then(r => r.data)
+        .catch(() => city),
+      // Refresh city_ids BEFORE selectCity so the CityProvider validation
+      // effect sees the city in the access list and doesn't clear selectedCity.
+      refreshCities(),
+    ])
     selectCity(fullCity)
-    await refreshCities()
     void router.navigate({ to: '/dashboard' })
   }
 

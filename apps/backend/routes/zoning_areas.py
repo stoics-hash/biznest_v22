@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from dto.ZoningAreaDto import (
@@ -81,6 +82,18 @@ def regenerate_zoning_pmtiles(
     Returns a fresh presigned URL (5 h TTL).
     """
     return zoning_area_service.regenerate_pmtile(city_id, db)
+
+
+@router.get("/{city_id}/zoning/geojson", summary="GeoJSON FeatureCollection for Turf.js")
+def get_zoning_geojson(
+    city_id: UUID,
+    bbox: str | None = Query(None, description="minLng,minLat,maxLng,maxLat — spatial filter"),
+    db: Session = Depends(get_db),
+):
+    return JSONResponse(
+        content=zoning_area_service.get_geojson(city_id, db, bbox),
+        media_type="application/geo+json",
+    )
 
 
 @router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
