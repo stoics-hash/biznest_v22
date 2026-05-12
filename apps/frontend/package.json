@@ -15,6 +15,7 @@
     "@networking/api": "workspace:*",
     "@tanstack/react-query": "^5.99.0",
     "@tanstack/react-router": "^1.168.22",
+    "@turf/turf": "^7.3.5",
     "axios": "^1.15.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

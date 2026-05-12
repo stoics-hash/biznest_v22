@@ -34,6 +34,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 }
 
 const AUTH_PATHS = ['/users/login', '/users/register', '/users/refresh', '/users/lgu/register']
+const RT_KEY = 'biznest:rt'
 
 type QueueItem = { resolve: (value: unknown) => void; reject: (err: unknown) => void }
 
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           })
           tokenManager.set(refreshRes.data.access_token)
           refreshTokenRef.current = refreshRes.data.refresh_token
+          sessionStorage.setItem(RT_KEY, refreshRes.data.refresh_token)
           refreshQueueRef.current.forEach(q => q.resolve(undefined))
           refreshQueueRef.current = []
           return axios(originalRequest)
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           refreshQueueRef.current.forEach(q => q.reject(refreshError))
           refreshQueueRef.current = []
           refreshTokenRef.current = null
+          sessionStorage.removeItem(RT_KEY)
           tokenManager.clear()
           dispatch({ type: 'UNAUTHENTICATED' })
           void router.navigate({ to: '/login' })
@@ -146,10 +149,29 @@ export function AuthProvider({ children }: PropsWithChildren) {
   async function restoreSession() {
     dispatch({ type: 'RESTORE_START' })
     try {
+      // Restore in-memory ref from sessionStorage so the interceptor can refresh later
+      const storedRt = sessionStorage.getItem(RT_KEY)
+      if (storedRt) {
+        refreshTokenRef.current = storedRt
+        // Proactively exchange for fresh tokens so the access token isn't stale
+        try {
+          const refreshRes = await refreshUsersRefreshPost({ refresh_token: storedRt })
+          tokenManager.set(refreshRes.data.access_token)
+          refreshTokenRef.current = refreshRes.data.refresh_token
+          sessionStorage.setItem(RT_KEY, refreshRes.data.refresh_token)
+        } catch {
+          // Refresh token expired — clear it and fall through; currentUserUsersMeGet
+          // may still succeed if the access token cookie is still valid
+          refreshTokenRef.current = null
+          sessionStorage.removeItem(RT_KEY)
+        }
+      }
       const userRes = await currentUserUsersMeGet()
       const result = await resolveAuth(userRes.data)
       dispatch({ type: 'AUTH_SUCCESS', ...result })
     } catch {
+      refreshTokenRef.current = null
+      sessionStorage.removeItem(RT_KEY)
       dispatch({ type: 'UNAUTHENTICATED' })
     }
   }
@@ -158,6 +180,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const loginRes = await loginUsersLoginPost({ username, password })
     tokenManager.set(loginRes.data.access_token)
     refreshTokenRef.current = loginRes.data.refresh_token
+    sessionStorage.setItem(RT_KEY, loginRes.data.refresh_token)
     const userRes = await currentUserUsersMeGet()
     const result = await resolveAuth(userRes.data)
     dispatch({ type: 'AUTH_SUCCESS', ...result })
@@ -168,6 +191,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const registerRes = await registerUsersRegisterPost({ email, username, password })
     tokenManager.set(registerRes.data.access_token)
     refreshTokenRef.current = registerRes.data.refresh_token
+    sessionStorage.setItem(RT_KEY, registerRes.data.refresh_token)
     const userRes = await currentUserUsersMeGet()
     const rolesRes = await listRolesRolesGet()
     const targetRole = rolesRes.data.find(r => r.name === role)
@@ -186,6 +210,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       tokenManager.clear()
       refreshTokenRef.current = null
+      sessionStorage.removeItem(RT_KEY)
       dispatch({ type: 'UNAUTHENTICATED' })
       await router.navigate({ to: '/login' })
     }

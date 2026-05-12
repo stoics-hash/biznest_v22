@@ -1,10 +1,11 @@
 """
 Geo-processing pipeline for zoning image analysis:
-  1. K-means color segmentation → zone regions
-  2. OpenCV contour detection → polygon boundaries
-  3. Projective transform (homography) → pixel coords to geographic coords
-  4. Google Vision OCR → zone label extraction
-  5. Tippecanoe → PMTiles for MapLibre rendering
+  1. Map-furniture detection → legend/title exclusion mask
+  2. K-means color segmentation (furniture regions white-filled before clustering)
+  3. OpenCV contour detection (excluded regions zeroed out)
+  4. Projective transform (homography) → pixel coords to geographic coords
+  5. Google Vision OCR → zone label extraction (legend text filtered out)
+  6. Tippecanoe → PMTiles for MapLibre rendering
 """
 from __future__ import annotations
 
@@ -57,6 +58,84 @@ def load_image_from_minio(file_id: str) -> tuple[bytes, np.ndarray]:
 
 
 # ---------------------------------------------------------------------------
+# Map-furniture detection — legend boxes, title bars, scale inserts
+# ---------------------------------------------------------------------------
+
+def detect_map_furniture(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Detect legend boxes, title bars, and other non-zone inserts in a zoning map.
+    Returns a boolean mask (H×W) — True = exclude from zone detection and OCR.
+
+    Strategy:
+    - Find near-white rectangular blobs that touch an image border.
+    - Legend/title boxes sit at the image edges with a white paper background.
+    - Actual map zones are colored and rarely abut the very image edge.
+
+    The mask is applied:
+    1. Before K-means: excluded pixels replaced with white so swatch colors
+       don't pollute zone clusters.
+    2. Before contour building: excluded pixels zeroed so legend swatches
+       don't create zone polygons.
+    3. Before OCR assignment: legend text centroid falls in excluded region
+       → discarded so it isn't attached to a nearby real zone.
+    """
+    h, w = image_bgr.shape[:2]
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+
+    # Near-white blobs (legend/title backgrounds are white paper)
+    _, white = cv2.threshold(gray, 228, 255, cv2.THRESH_BINARY)
+
+    # Close small gaps so text characters and swatch patches merge into one blob
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 18))
+    closed = cv2.morphologyEx(white, cv2.MORPH_CLOSE, k)
+
+    cnts, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    exclude = np.zeros((h, w), dtype=bool)
+    img_area = float(h * w)
+
+    for c in cnts:
+        x, y, bw, bh = cv2.boundingRect(c)
+        box_area = bw * bh
+        if box_area == 0:
+            continue
+
+        # Size gate: 0.5 % – 35 % of image
+        if box_area < img_area * 0.005 or box_area > img_area * 0.35:
+            continue
+
+        # Rectangularity: contour fill ratio (irregular blobs < 0.55)
+        fill = cv2.contourArea(c) / box_area
+        if fill < 0.55:
+            continue
+
+        # Aspect: not a thin borderline (max 7:1)
+        aspect = max(bw, bh) / max(min(bw, bh), 1)
+        if aspect > 7.0:
+            continue
+
+        # Interior must be predominantly white (≥ 45 %)
+        roi = gray[y:y + bh, x:x + bw]
+        if (roi > 210).mean() < 0.45:
+            continue
+
+        # Must touch an image border — legend/title boxes always sit at an edge
+        margin_x = int(w * 0.06)
+        margin_y = int(h * 0.06)
+        if not (
+            x <= margin_x
+            or (x + bw) >= w - margin_x
+            or y <= margin_y
+            or (y + bh) >= h - margin_y
+        ):
+            continue
+
+        exclude[y:y + bh, x:x + bw] = True
+
+    return exclude
+
+
+# ---------------------------------------------------------------------------
 # Georeferencing — pixel ↔ geographic coordinate transform
 # ---------------------------------------------------------------------------
 
@@ -83,29 +162,13 @@ def transform_pixels_to_geo(pixel_pts: np.ndarray, H: np.ndarray) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# Color segmentation — K-means
+# Color helpers
 # ---------------------------------------------------------------------------
 
-def segment_by_color(
-    image_bgr: np.ndarray, n_colors: int = 8
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    K-means clustering on pixel colors.
-    Fits on a ≤600px thumbnail for speed; predicts at full resolution.
-    Returns (label_map H×W int32, cluster_centers N×3 uint8 RGB).
-    """
-    img_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    h, w = img_rgb.shape[:2]
-
-    scale = min(1.0, 600.0 / max(h, w, 1))
-    small = cv2.resize(img_rgb, (max(1, int(w * scale)), max(1, int(h * scale))))
-
-    km = KMeans(n_clusters=n_colors, random_state=42, n_init=10, max_iter=300)
-    km.fit(small.reshape(-1, 3).astype(np.float32))
-
-    labels = km.predict(img_rgb.reshape(-1, 3).astype(np.float32))
-    centers = km.cluster_centers_.astype(np.uint8)  # RGB
-    return labels.reshape(h, w).astype(np.int32), centers
+def color_to_hex(rgb: np.ndarray) -> str:
+    """Convert a 3-element uint8 RGB array to a '#RRGGBB' hex string."""
+    r, g, b = int(rgb[0]), int(rgb[1]), int(rgb[2])
+    return f"#{r:02X}{g:02X}{b:02X}"
 
 
 def _is_near_white(rgb: np.ndarray) -> bool:
@@ -117,6 +180,42 @@ def _is_near_black(rgb: np.ndarray) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Color segmentation — K-means
+# ---------------------------------------------------------------------------
+
+def segment_by_color(
+    image_bgr: np.ndarray,
+    n_colors: int = 8,
+    exclude_mask: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    K-means clustering on pixel colors.
+    Fits on a ≤600px thumbnail for speed; predicts at full resolution.
+
+    exclude_mask (H×W bool): regions white-filled before clustering so
+    legend/title swatches don't create spurious color clusters.
+
+    Returns (label_map H×W int32, cluster_centers N×3 uint8 RGB).
+    """
+    img_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+
+    if exclude_mask is not None:
+        img_rgb = img_rgb.copy()
+        img_rgb[exclude_mask] = [255, 255, 255]
+
+    h, w = img_rgb.shape[:2]
+    scale = min(1.0, 600.0 / max(h, w, 1))
+    small = cv2.resize(img_rgb, (max(1, int(w * scale)), max(1, int(h * scale))))
+
+    km = KMeans(n_clusters=n_colors, random_state=42, n_init=10, max_iter=300)
+    km.fit(small.reshape(-1, 3).astype(np.float32))
+
+    labels = km.predict(img_rgb.reshape(-1, 3).astype(np.float32))
+    centers = km.cluster_centers_.astype(np.uint8)  # RGB
+    return labels.reshape(h, w).astype(np.int32), centers
+
+
+# ---------------------------------------------------------------------------
 # Contour detection
 # ---------------------------------------------------------------------------
 
@@ -125,10 +224,15 @@ def get_zone_contours(
     n_colors: int,
     min_area_px: int,
     centers_rgb: np.ndarray,
+    exclude_mask: np.ndarray | None = None,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
     """
     For each non-white, non-black cluster extract cleaned contours.
     Returns list of (contour_array, color_rgb_uint8).
+
+    exclude_mask: pixels in excluded regions are zeroed before contour
+    detection so legend swatches never produce zone polygons.
+
     Morphological close+open removes noise and fills small gaps.
     """
     results: list[tuple[np.ndarray, np.ndarray]] = []
@@ -140,6 +244,11 @@ def get_zone_contours(
             continue
 
         mask = ((label_map == idx) * 255).astype(np.uint8)
+
+        # Zero out legend/title areas so swatch patches don't become contours
+        if exclude_mask is not None:
+            mask[exclude_mask] = 0
+
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
@@ -196,7 +305,8 @@ def run_ocr(image_bytes: bytes) -> list[dict]:
                 "vertices": [(x, y) for x, y in zip(xs, ys)],
             })
         return results
-    except Exception:
+    except Exception as exc:
+        print(f"[OCR] skipped — {type(exc).__name__}: {exc}", flush=True)
         return []
 
 
@@ -205,15 +315,25 @@ def run_ocr(image_bytes: bytes) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _point_in_contour(contour: np.ndarray, x: float, y: float) -> bool:
-    return cv2.pointPolygonTest(contour, (x, y), False) >= 0
+    return cv2.pointPolygonTest(contour, (float(x), float(y)), False) >= 0
+
+
+def _point_near_contour(contour: np.ndarray, x: float, y: float, tolerance: float = 20.0) -> bool:
+    """True if point is inside contour OR within `tolerance` pixels of its edge."""
+    return cv2.pointPolygonTest(contour, (float(x), float(y)), measureDist=True) >= -tolerance
 
 
 def assign_labels(
     contours_with_colors: list[tuple[np.ndarray, np.ndarray]],
     ocr_results: list[dict],
+    exclude_mask: np.ndarray | None = None,
 ) -> list[str | None]:
     """
     Map Vision API descriptions to zone contours.
+
+    exclude_mask: OCR annotations whose centroid falls inside an excluded
+    region (legend, title bar) are discarded before assignment so legend
+    category names don't get attached to nearby real zones.
 
     Strategy per annotation:
       1. Test centroid (cx, cy) — covers most cases.
@@ -224,15 +344,29 @@ def assign_labels(
     word twice from overlapping detections). Result is space-joined and
     stored as zone_type, e.g. "MUNICIPALITY" or "RESIDENTIAL ZONE".
     """
+    # Filter out legend/title text before any zone matching
+    if exclude_mask is not None and ocr_results:
+        h, w = exclude_mask.shape
+        filtered: list[dict] = []
+        for ocr in ocr_results:
+            cy = max(0, min(int(ocr["cy"]), h - 1))
+            cx = max(0, min(int(ocr["cx"]), w - 1))
+            if not exclude_mask[cy, cx]:
+                filtered.append(ocr)
+        ocr_results = filtered
+
     labels: list[str | None] = []
     for contour, _ in contours_with_colors:
         seen: set[str] = set()
         texts: list[str] = []
         for ocr in ocr_results:
+            # Strict: centroid inside contour
             inside = _point_in_contour(contour, ocr["cx"], ocr["cy"])
             if not inside:
+                # Tolerant: any vertex within 20 px of boundary
+                # catches labels whose centroid lands just outside a thin zone edge
                 inside = any(
-                    _point_in_contour(contour, vx, vy)
+                    _point_near_contour(contour, vx, vy, tolerance=20.0)
                     for vx, vy in ocr.get("vertices", [])
                 )
             if inside and ocr["text"] not in seen:

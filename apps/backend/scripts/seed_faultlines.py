@@ -4,8 +4,8 @@ Seed Philippine fault lines from local GeoJSON into the database.
 Source : geo_hazard/faultline/faultline.geojson
          (PHIVOLCS/GEM Global Earthquake Model — not from Project NOAH)
 
-Spatial-joins fault lines to province boundaries, generates one PMTile
-per province, and stores each feature as a separate HazardArea row.
+Spatial-joins fault lines to city boundaries, generates one PMTile
+per city, and stores each feature as a separate HazardArea row.
 
 Usage:
   python scripts/seed_faultlines.py              # seed + generate PMTiles
@@ -35,7 +35,7 @@ from geoalchemy2.shape import from_shape
 from core.db import SessionLocal
 from core.minio_client import minio_client, BUCKET_NAME
 import models  # noqa: F401
-from models.province import Province
+from models.city import City
 from models.hazard_area import HazardArea
 
 BACKEND_DIR       = Path(__file__).resolve().parent.parent
@@ -43,33 +43,31 @@ FAULTLINE_GEOJSON = BACKEND_DIR / "geo_hazard" / "faultline" / "faultline.geojso
 
 
 # ---------------------------------------------------------------------------
-# Shared helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ProvinceInfo:
+class CityInfo:
     id:   str
     name: str
     code: Optional[str]
 
 
-def _build_provinces_gdf(db) -> tuple:
+def _build_cities_gdf(db) -> tuple:
     import geopandas as gpd
     from geoalchemy2.shape import to_shape
 
     ids, geoms, infos = [], [], {}
-    for p in db.query(Province).all():
-        if p.boundary is None:
-            continue
+    for c in db.query(City).filter(City.boundary.isnot(None)).all():
         try:
-            info = ProvinceInfo(id=str(p.id), name=str(p.name), code=str(p.code) if p.code else None)
-            ids.append(str(p.id))
-            geoms.append(to_shape(p.boundary))
-            infos[str(p.id)] = info
+            info = CityInfo(id=str(c.id), name=str(c.name), code=str(c.code) if c.code else None)
+            ids.append(str(c.id))
+            geoms.append(to_shape(c.boundary))
+            infos[str(c.id)] = info
         except Exception:
             pass
 
-    gdf = gpd.GeoDataFrame({"province_id_ref": ids}, geometry=geoms, crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame({"city_id_ref": ids}, geometry=geoms, crs="EPSG:4326")
     return gdf.reset_index(drop=True), infos
 
 
@@ -120,9 +118,9 @@ def _generate_pmtiles(geojson_path: Path, minio_key: str) -> Optional[str]:
 
 
 def _replace_features(
-    province_id: str,
-    pmtile_url:  Optional[str],
-    wkbs:        list,
+    city_id:    str,
+    pmtile_url: Optional[str],
+    wkbs:       list,
 ) -> int:
     if not wkbs:
         return 0
@@ -130,7 +128,7 @@ def _replace_features(
         db.execute(
             sa.delete(HazardArea).where(
                 sa.and_(
-                    HazardArea.province_id == province_id,
+                    HazardArea.city_id == city_id,
                     HazardArea.hazard_type == "faultline",
                     HazardArea.scenario.is_(None),
                 )
@@ -141,7 +139,7 @@ def _replace_features(
             [
                 {
                     "id":          str(uuid4()),
-                    "province_id": province_id,
+                    "city_id":     city_id,
                     "hazard_type": "faultline",
                     "scenario":    None,
                     "pmtile_url":  pmtile_url,
@@ -179,40 +177,40 @@ def seed_faultlines(skip_pmtiles: bool) -> None:
     elif gdf.crs.to_epsg() != 4326:
         gdf = gdf.to_crs("EPSG:4326")
 
-    print("  Building province geometry index…", flush=True)
+    print("  Building city boundary index…", flush=True)
     with SessionLocal() as db:
-        provinces_gdf, province_infos = _build_provinces_gdf(db)
-    print(f"  {len(provinces_gdf)} provinces with geometry")
+        cities_gdf, city_infos = _build_cities_gdf(db)
+    print(f"  {len(cities_gdf)} cities with geometry")
 
     joined = gpd.sjoin(
         gdf[["geometry"]],
-        provinces_gdf[["province_id_ref", "geometry"]],
+        cities_gdf[["city_id_ref", "geometry"]],
         how="inner", predicate="intersects",
     )
     if joined.empty:
-        print("  No faultlines intersect any province boundary.")
+        print("  No faultlines intersect any city boundary.")
         return
 
-    joined = joined[["province_id_ref", "geometry"]].copy()
+    joined = joined[["city_id_ref", "geometry"]].copy()
     total_rows = 0
 
-    for prov_id_str, group in joined.groupby("province_id_ref"):
-        province = province_infos.get(str(prov_id_str))
-        if not province or not province.code:
+    for city_id_str, group in joined.groupby("city_id_ref"):
+        city = city_infos.get(str(city_id_str))
+        if not city or not city.code:
             continue
 
         pmtile_url = None
         if not skip_pmtiles:
-            minio_key = f"pmtiles/hazards/faultline/all/province-{province.code}.pmtiles"
+            minio_key = f"pmtiles/hazards/faultline/all/city-{city.code}.pmtiles"
             with tempfile.TemporaryDirectory() as tmp:
                 slice_path = Path(tmp) / "faultline.geojson"
                 group[["geometry"]].to_file(str(slice_path), driver="GeoJSON")
                 pmtile_url = _generate_pmtiles(slice_path, minio_key)
 
         wkbs = [w for g in group.geometry if (w := _geom_to_wkb(g)) is not None]
-        count = _replace_features(str(province.id), pmtile_url, wkbs)
+        count = _replace_features(str(city.id), pmtile_url, wkbs)
         total_rows += count
-        print(f"  [{province.name}] {count} rows", flush=True)
+        print(f"  [{city.name}] {count} rows", flush=True)
 
     print(f"\n  → {total_rows} faultline rows inserted")
 

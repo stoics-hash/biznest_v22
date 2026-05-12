@@ -76,6 +76,14 @@ function ZoningMap({ children }: PropsWithChildren) {
       hazardLayers: [],
       visibleHazardKeys: new Set(),
       toggleHazard: () => {},
+      zoningPmtileUrl: null,
+      showZoning: false,
+      setShowZoning: () => {},
+      visibleZoningTypes: null,
+      toggleZoningType: () => {},
+      clickedZone: null,
+      setClickedZone: () => {},
+      refreshZoningLayer: async () => {},
     }}>
       <div ref={containerRef} className="relative size-full">
         {children}

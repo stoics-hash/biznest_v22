@@ -1,8 +1,10 @@
+import json
 from uuid import UUID
 
 from fastapi import HTTPException
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import mapping
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from dto.ZoningAreaDto import (
@@ -83,12 +85,15 @@ def process_zoning_image(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # K-means color segmentation
-    label_map, centers_rgb = gps.segment_by_color(image_bgr, payload.n_colors)
+    # Detect legend boxes, title bars, scale inserts — build exclusion mask
+    exclude_mask = gps.detect_map_furniture(image_bgr)
 
-    # Extract contours per color cluster (skip white/black background clusters)
+    # K-means color segmentation (legend regions white-filled before clustering)
+    label_map, centers_rgb = gps.segment_by_color(image_bgr, payload.n_colors, exclude_mask)
+
+    # Extract contours per color cluster (excluded regions zeroed, skip white/black)
     contours_with_colors = gps.get_zone_contours(
-        label_map, payload.n_colors, payload.min_area_px, centers_rgb
+        label_map, payload.n_colors, payload.min_area_px, centers_rgb, exclude_mask
     )
 
     if not contours_with_colors:
@@ -97,12 +102,26 @@ def process_zoning_image(
             detail="No colored zones detected. Try increasing n_colors or decreasing min_area_px.",
         )
 
-    # OCR — assign zone labels (falls back to [] on API failure)
+    # OCR — assign zone labels; legend/title text filtered by exclude_mask
     ocr_results = gps.run_ocr(image_bytes)
-    labels = gps.assign_labels(contours_with_colors, ocr_results)
+    labels = gps.assign_labels(contours_with_colors, ocr_results, exclude_mask)
+
+    # Fallback zone_type: when OCR returns nothing (not configured / no text on zone),
+    # use the detected color as a human-readable name so zone_type is never null.
+    color_counts: dict[str, int] = {}
+    resolved_labels: list[str | None] = []
+    for (_, color_rgb), label in zip(contours_with_colors, labels):
+        if label:
+            resolved_labels.append(label)
+        else:
+            hex_c = gps.color_to_hex(color_rgb)
+            n = color_counts.get(hex_c, 0) + 1
+            color_counts[hex_c] = n
+            resolved_labels.append(hex_c if n == 1 else f"{hex_c} ({n})")
+    labels = resolved_labels
 
     # Vectorize contours → geo polygons → ZoningArea records
-    created_zones: list[tuple[ZoningArea, object]] = []  # (db record, shapely poly)
+    created_zones: list[tuple[ZoningArea, object, str | None]] = []  # (db, poly, color_hex)
     skipped = 0
 
     for (contour, color_rgb), zone_type in zip(contours_with_colors, labels):
@@ -110,14 +129,16 @@ def process_zoning_image(
         if poly is None:
             skipped += 1
             continue
+        color_hex = gps.color_to_hex(color_rgb)
         zone = ZoningArea(
             city_id=city_id,
             zone_type=zone_type,
+            color_hex=color_hex,
             geometry=from_shape(poly, srid=4326),
             created_by=user_id,
         )
         db.add(zone)
-        created_zones.append((zone, poly))
+        created_zones.append((zone, poly, color_hex))
 
     if not created_zones:
         raise HTTPException(
@@ -126,7 +147,7 @@ def process_zoning_image(
         )
 
     db.commit()
-    for zone, _ in created_zones:
+    for zone, _, _c in created_zones:
         db.refresh(zone)
 
     # Build GeoJSON from ALL city zones (newly created + existing) for PMTile
@@ -140,7 +161,11 @@ def process_zoning_image(
         try:
             features.append({
                 "type": "Feature",
-                "properties": {"zone_type": z.zone_type},
+                "properties": {
+                    "id": str(z.id),
+                    "zone_type": z.zone_type or "",
+                    "color": z.color_hex or "#888888",
+                },
                 "geometry": mapping(to_shape(z.geometry)),
             })
         except Exception:
@@ -168,12 +193,13 @@ def process_zoning_image(
             id=zone.id,
             city_id=zone.city_id,
             zone_type=zone.zone_type,
+            color_hex=color_hex,
             geometry=dict(mapping(poly)),
             pmtile_url=object_key,
             created_by=zone.created_by,
             created_at=zone.created_at,
         )
-        for zone, poly in created_zones
+        for zone, poly, color_hex in created_zones
     ]
 
     return ZoningProcessResponse(
@@ -182,6 +208,103 @@ def process_zoning_image(
         pmtile_url=presigned_url,
         zones=zone_responses,
     )
+
+
+def regenerate_pmtile(city_id: UUID, db: Session) -> ZoningPmtilesResponse:
+    """
+    Rebuild the city's zoning PMTile from current DB records (zone_type + color_hex)
+    without reprocessing the source image. Use after patching zone_type labels.
+    Raises 404 if the city has no zoning geometry yet.
+    """
+    if not db.query(City).filter(City.id == city_id).first():
+        raise HTTPException(status_code=404, detail="City not found")
+
+    zones = (
+        db.query(ZoningArea)
+        .filter(ZoningArea.city_id == city_id, ZoningArea.geometry.isnot(None))
+        .all()
+    )
+    if not zones:
+        raise HTTPException(
+            status_code=404,
+            detail="No zoning geometry found for this city. Run process-image first.",
+        )
+
+    features = []
+    for z in zones:
+        try:
+            features.append({
+                "type": "Feature",
+                "properties": {
+                    "id": str(z.id),
+                    "zone_type": z.zone_type or "",
+                    "color": z.color_hex or "#888888",
+                },
+                "geometry": mapping(to_shape(z.geometry)),
+            })
+        except Exception:
+            continue
+
+    if not features:
+        raise HTTPException(status_code=422, detail="No valid geometries to tile.")
+
+    object_key = gps.generate_pmtiles(
+        {"type": "FeatureCollection", "features": features},
+        city_id,
+    )
+    if not object_key:
+        raise HTTPException(
+            status_code=422,
+            detail="PMTile generation failed — tippecanoe not available.",
+        )
+
+    db.query(ZoningArea).filter(ZoningArea.city_id == city_id).update(
+        {"pmtile_url": object_key},
+        synchronize_session="fetch",
+    )
+    db.commit()
+
+    return ZoningPmtilesResponse(
+        pmtile_url=gps.presign_pmtile(object_key),
+        object_key=object_key,
+    )
+
+
+def get_geojson(city_id: UUID, db: Session, bbox: str | None = None) -> dict:
+    """
+    Return a GeoJSON FeatureCollection of all zoning areas for a city.
+    Optional bbox='minLng,minLat,maxLng,maxLat' spatially filters via PostGIS ST_Intersects.
+    Geometry is serialized by PostGIS (ST_AsGeoJSON) — no Shapely roundtrip.
+    """
+    q = db.query(
+        ZoningArea.id,
+        ZoningArea.zone_type,
+        ZoningArea.color_hex,
+        func.ST_AsGeoJSON(ZoningArea.geometry).label("geojson"),
+    ).filter(ZoningArea.city_id == city_id, ZoningArea.geometry.isnot(None))
+
+    if bbox:
+        try:
+            min_lng, min_lat, max_lng, max_lat = (float(v.strip()) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="bbox must be 'minLng,minLat,maxLng,maxLat'")
+        envelope = func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
+        q = q.filter(func.ST_Intersects(ZoningArea.geometry, envelope))
+
+    features = [
+        {
+            "type": "Feature",
+            "id": str(row.id),
+            "geometry": json.loads(row.geojson),
+            "properties": {
+                "id": str(row.id),
+                "zone_type": row.zone_type,
+                "color_hex": row.color_hex,
+            },
+        }
+        for row in q.all()
+    ]
+    return {"type": "FeatureCollection", "features": features}
 
 
 def get_city_pmtile_url(city_id: UUID, db: Session) -> ZoningPmtilesResponse:

@@ -9,15 +9,15 @@ services:
     volumes:
       - biznest_db:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5434:5432"
     networks:
       - biznest_net
   minio:
     image: minio/minio:latest
     container_name: biznest_minio
     ports:
-      - "9000:9000"
-      - "9090:9090"
+      - "9001:9000"
+      - "9091:9090"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
@@ -26,11 +26,36 @@ services:
       - biznest_net
     volumes:
       - biznest_data:/data
+  redis:
+    image: redis:7-alpine
+    container_name: biznest_redis
+    ports:
+      - "6381:6379"
+    networks:
+      - biznest_net
+    volumes:
+      - biznest_redis:/data
+    command: redis-server --appendonly yes
+
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: biznest_redis_insight
+    ports:
+      - "8001:8001"
+    networks:
+      - biznest_net
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: redis:6381
+
 volumes:
   biznest_db:
     name: biznest_db
   biznest_data:
     name: biznest_data
+  biznest_redis:
+    name: biznest_redis
 
 networks:
   biznest_net:

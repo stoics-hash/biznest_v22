@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from dto.ZoningAreaDto import (
@@ -69,6 +70,32 @@ def get_zoning_pmtiles(city_id: UUID, db: Session = Depends(get_db)):
     return zoning_area_service.get_city_pmtile_url(city_id, db)
 
 
+@router.post("/{city_id}/zoning/regenerate-pmtiles", response_model=ZoningPmtilesResponse)
+def regenerate_zoning_pmtiles(
+    city_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_authenticated_user),
+):
+    """
+    Rebuild the city's zoning PMTile from current DB records.
+    Call after patching zone_type labels via PATCH /{city_id}/zoning/{zone_id}.
+    Returns a fresh presigned URL (5 h TTL).
+    """
+    return zoning_area_service.regenerate_pmtile(city_id, db)
+
+
+@router.get("/{city_id}/zoning/geojson", summary="GeoJSON FeatureCollection for Turf.js")
+def get_zoning_geojson(
+    city_id: UUID,
+    bbox: str | None = Query(None, description="minLng,minLat,maxLng,maxLat — spatial filter"),
+    db: Session = Depends(get_db),
+):
+    return JSONResponse(
+        content=zoning_area_service.get_geojson(city_id, db, bbox),
+        media_type="application/geo+json",
+    )
+
+
 @router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
 def get_zoning_area(city_id: UUID, zone_id: UUID, db: Session = Depends(get_db)):
     return zoning_area_service.get_or_404(zone_id, city_id, db)
@@ -85,13 +112,23 @@ def update_zoning_area(
     return zoning_area_service.update(zone_id, city_id, payload, db)
 
 
-@router.delete("/{city_id}/zoning/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{city_id}/zoning/{zone_id}", response_model=ZoningPmtilesResponse | None)
 def delete_zoning_area(
     city_id: UUID,
     zone_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_authenticated_user),
 ):
+    """
+    Delete a zone and regenerate the city's PMTile from remaining zones.
+    Returns the new presigned PMTile URL, or null if no zones remain.
+    """
     zoning_area_service.delete(zone_id, city_id, db)
+    try:
+        return zoning_area_service.regenerate_pmtile(city_id, db)
+    except HTTPException as exc:
+        if exc.status_code == 404:  # no zones left — nothing to tile
+            return None
+        raise
 
 

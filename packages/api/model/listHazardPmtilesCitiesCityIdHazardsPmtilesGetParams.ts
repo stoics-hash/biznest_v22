@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListHazardPmtilesProvincesProvinceIdHazardsPmtilesGetParams = {
+export type ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams = {
 hazard_type?: string | null;
 scenario?: string | null;
 };

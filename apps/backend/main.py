@@ -1,10 +1,13 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.db import engine, SessionLocal
+from core.redis import get_redis_client
 from models.base import Base
 import models  # registers all models with Base.metadata
 from core.seed import seed
@@ -25,14 +28,26 @@ from routes.user_roles import router as user_roles_router
 from routes.saved_locations import router as saved_locations_router
 from routes.audit_logs import router as audit_logs_router
 
-Base.metadata.create_all(bind=engine)
 
-with SessionLocal() as db:
-    seed(db)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- startup ---
+    Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        seed(db)
 
-print("RUNNING MAIN FILE:  ", __file__)
+    app.state.redis = get_redis_client()
+    app.state.db_engine = engine
 
-app = FastAPI(title="BizNest Geo-Intelligence API")
+    print("RUNNING MAIN FILE:  ", __file__)
+    yield
+
+    # --- shutdown ---
+    app.state.redis.close()
+    engine.dispose()
+
+
+app = FastAPI(title="BizNest Geo-Intelligence API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,7 +61,7 @@ app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(files_router, prefix="/files", tags=["files"])
 app.include_router(cities_router, prefix="/cities", tags=["cities"])
 app.include_router(zoning_router, prefix="/cities", tags=["zoning"])
-app.include_router(hazard_router, prefix="/provinces", tags=["hazards"])
+app.include_router(hazard_router, prefix="/cities", tags=["hazards"])
 app.include_router(establishments_router, prefix="/cities", tags=["establishments"])
 app.include_router(alerts_router, prefix="/cities", tags=["alerts"])
 app.include_router(subscriptions_router, prefix="/subscriptions", tags=["subscriptions"])

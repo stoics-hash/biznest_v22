@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
-import { listCitiesCitiesGet, createCityCitiesPost } from '@networking/api/generated/cities/cities'
+import { listCitiesCitiesGet, createCityCitiesPost, getCityCitiesCityIdGet } from '@networking/api/generated/cities/cities'
 import { myAccessCityAccessMeGet, grantAccessCityAccessPost } from '@networking/api/generated/city-access/city-access'
 import { listAssignmentsLguAssignmentsGet, createAssignmentLguAssignmentsPost } from '@networking/api/generated/lgu-assignments/lgu-assignments'
 import { getMySubscriptionSubscriptionsMeGet } from '@networking/api/generated/subscriptions/subscriptions'
@@ -17,8 +17,8 @@ export function useCitySetup() {
   const router = useRouter()
 
   const { data: allCities = [], isLoading: citiesLoading } = useQuery({
-    queryKey: ['/cities/'],
-    queryFn: () => listCitiesCitiesGet().then(r => r.data),
+    queryKey: ['/cities/', { include_geometry: false }],
+    queryFn: () => listCitiesCitiesGet({ include_geometry: false }).then(r => r.data),
   })
 
   const { data: myAccess = [], isLoading: accessLoading } = useQuery({
@@ -55,8 +55,15 @@ export function useCitySetup() {
   const atLimit = maxCities !== null && myCityIds.length >= maxCities
 
   async function enterCity(city: CityResponse) {
-    selectCity(city)
-    await refreshCities()
+    const [fullCity] = await Promise.all([
+      getCityCitiesCityIdGet(city.id, { include_geometry: true })
+        .then(r => r.data)
+        .catch(() => city),
+      // Refresh city_ids BEFORE selectCity so the CityProvider validation
+      // effect sees the city in the access list and doesn't clear selectedCity.
+      refreshCities(),
+    ])
+    selectCity(fullCity)
     void router.navigate({ to: '/dashboard' })
   }
 

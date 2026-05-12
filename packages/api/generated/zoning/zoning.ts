@@ -313,6 +313,68 @@ export function useGetZoningPmtilesCitiesCityIdZoningPmtilesGet<TData = Awaited<
 
 
 /**
+ * Rebuild the city's zoning PMTile from current DB records.
+Call after patching zone_type labels via PATCH /{city_id}/zoning/{zone_id}.
+Returns a fresh presigned URL (5 h TTL).
+ * @summary Regenerate Zoning Pmtiles
+ */
+export const regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost = (
+    cityId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<ZoningPmtilesResponse>> => {
+
+
+    return axios.default.post(
+      `/cities/${cityId}/zoning/regenerate-pmtiles`,undefined,options
+    );
+  }
+
+
+
+export const getRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost>>, TError,{cityId: string}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost>>, TError,{cityId: string}, TContext> => {
+
+const mutationKey = ['regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost'];
+const {mutation: mutationOptions, axios: axiosOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, axios: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost>>, {cityId: string}> = (props) => {
+          const {cityId} = props ?? {};
+
+          return  regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost(cityId,axiosOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPostMutationResult = NonNullable<Awaited<ReturnType<typeof regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost>>>
+
+    export type RegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPostMutationError = AxiosError<HTTPValidationError>
+
+    /**
+ * @summary Regenerate Zoning Pmtiles
+ */
+export const useRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost>>, TError,{cityId: string}, TContext>, axios?: AxiosRequestConfig}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof regenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost>>,
+        TError,
+        {cityId: string},
+        TContext
+      > => {
+      return useMutation(getRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPostMutationOptions(options));
+    }
+    /**
  * @summary Get Zoning Area
  */
 export const getZoningAreaCitiesCityIdZoningZoneIdGet = (
@@ -445,12 +507,14 @@ export const useUpdateZoningAreaCitiesCityIdZoningZoneIdPatch = <TError = AxiosE
       return useMutation(getUpdateZoningAreaCitiesCityIdZoningZoneIdPatchMutationOptions(options));
     }
     /**
+ * Delete a zone and regenerate the city's PMTile from remaining zones.
+Returns the new presigned PMTile URL, or null if no zones remain.
  * @summary Delete Zoning Area
  */
 export const deleteZoningAreaCitiesCityIdZoningZoneIdDelete = (
     cityId: string,
     zoneId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<void>> => {
+ ): Promise<AxiosResponse<ZoningPmtilesResponse | null>> => {
 
 
     return axios.default.delete(
