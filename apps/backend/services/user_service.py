@@ -23,7 +23,8 @@ from core.security import (
     set_refresh_cookie,
     user_to_cache_dict,
 )
-from utils.jwtUtils import create_jwt, hash_password, hash_token, verify_password
+from core.security import hash_password, hash_token, verify_password
+from utils.jwtUtils import create_jwt
 
 
 def _warm_user_cache(user: User, rc: redis_lib.Redis | None) -> None:

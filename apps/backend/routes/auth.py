@@ -7,7 +7,7 @@ from core.security import get_authenticated_user, get_refresh_token
 from schema.UserDto import AuthResponse, LoginRequest, LogoutRequest, RefreshRequest, RegisterRequest, UserResponse
 from models.user import User
 from services import user_service
-from utils.jwtUtils import get_db
+from core.db import get_db
 
 router = APIRouter(tags=["auth"])
 

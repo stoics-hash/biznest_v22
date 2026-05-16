@@ -10,7 +10,7 @@ from schema.CityDto import CityGeometryResponse, CitySelectResponse
 from schema.InvestorCityAccessDto import InvestorCityAccessCreate, InvestorCityAccessResponse
 from models.user import User
 from services import investor_city_access_service
-from utils.jwtUtils import get_db
+from core.db import get_db
 
 router = APIRouter()
 

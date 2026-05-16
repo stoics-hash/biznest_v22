@@ -5,7 +5,7 @@ from core.security import get_authenticated_user
 from schema.UserDto import AuthResponse, LguInviteRequest, LguInviteResponse, LguRegisterRequest, TokenVerifyResponse, UserResponse
 from models.user import User
 from services import lgu_invitation_service, user_service
-from utils.jwtUtils import get_db
+from core.db import get_db
 
 router = APIRouter(tags=["users"])
 

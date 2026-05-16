@@ -9,7 +9,7 @@ from core.security import get_authenticated_user
 from schema.CityDto import CityCreate, CityGeometryResponse, CityResponse, CityUpdate
 from models.user import User
 from services import city_service
-from utils.jwtUtils import get_db
+from core.db import get_db
 
 router = APIRouter()
 
