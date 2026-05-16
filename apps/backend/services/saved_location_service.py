@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.SavedLocationDto import SavedLocationCreate
+from schema.SavedLocationDto import SavedLocationCreate
 from models.saved_location import SavedLocation
 
 

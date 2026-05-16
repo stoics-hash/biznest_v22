@@ -319,6 +319,11 @@ export class MapEngine {
    * Fly the map to fit the city boundary with padding.
    */
   flyToCityBoundary(boundary: BoundaryGeometry): this {
+    if (!this._map.isStyleLoaded()) {
+      this._map.once('idle', () => this.flyToCityBoundary(boundary))
+      return this
+    }
+    this._map.resize()
     const [w, s, e, n] = this._bbox(boundary)
     // maxZoom: 16 ≈ 1 km ground scale at typical viewport width
     this._map.fitBounds([[w, s], [e, n]], { padding: 60, maxZoom: 16, duration: 1200 })

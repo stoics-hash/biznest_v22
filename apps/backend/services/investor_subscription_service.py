@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.InvestorSubscriptionDto import InvestorSubscriptionCreate, InvestorSubscriptionUpdate
+from schema.InvestorSubscriptionDto import InvestorSubscriptionCreate, InvestorSubscriptionUpdate
 from models.investor_subscription import InvestorSubscription
 from models.subscription_plan import SubscriptionPlan
 

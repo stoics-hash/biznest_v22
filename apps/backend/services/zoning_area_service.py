@@ -7,7 +7,7 @@ from shapely.geometry import mapping
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from dto.ZoningAreaDto import (
+from schema.ZoningAreaDto import (
     ZoningAreaCreate,
     ZoningAreaResponse,
     ZoningAreaUpdate,

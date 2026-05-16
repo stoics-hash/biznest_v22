@@ -33,7 +33,7 @@ Axios.interceptors.response.use(
       console.error('Access denied:', detail ?? 'You do not have permission to access this resource.')
     }
 
-    if (!error.response) {
+    if (!error.response && !Axios.isCancel(error) && error.code !== 'ERR_CANCELED') {
       console.error('Network error: server unreachable or returned no response.')
     }
 

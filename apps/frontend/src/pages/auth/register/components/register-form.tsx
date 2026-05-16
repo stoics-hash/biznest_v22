@@ -9,8 +9,8 @@ import { Spinner } from '@/components/ui/spinner'
 interface RegisterFormProps {
   email: string
   setEmail: Dispatch<SetStateAction<string>>
-  username: string
-  setUsername: Dispatch<SetStateAction<string>>
+  fullName: string
+  setFullName: Dispatch<SetStateAction<string>>
   password: string
   setPassword: Dispatch<SetStateAction<string>>
   error: string | null
@@ -21,8 +21,8 @@ interface RegisterFormProps {
 export function RegisterForm({
   email,
   setEmail,
-  username,
-  setUsername,
+  fullName,
+  setFullName,
   password,
   setPassword,
   error,
@@ -59,17 +59,17 @@ export function RegisterForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="full-name">Full name</Label>
           <Input
-            id="username"
+            id="full-name"
             type="text"
-            placeholder="your_username"
-            autoComplete="username"
+            placeholder="Juan dela Cruz"
+            autoComplete="name"
             required
-            minLength={3}
-            maxLength={50}
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            minLength={2}
+            maxLength={100}
+            value={fullName}
+            onChange={e => setFullName(e.target.value)}
           />
         </div>
 

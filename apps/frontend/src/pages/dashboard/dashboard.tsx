@@ -30,7 +30,7 @@ export function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Welcome back, {user?.username}
+          Welcome back, {user?.full_name ?? user?.email}
         </p>
       </div>
 

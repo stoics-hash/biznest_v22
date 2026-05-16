@@ -12,6 +12,8 @@ from models.base import Base
 import models  # registers all models with Base.metadata
 from core.seed import seed
 
+from core.middleware import auth_enforcement_middleware
+from routes.auth import router as auth_router
 from routes.users import router as users_router
 from routes.files import router as files_router
 from routes.cities import router as cities_router
@@ -49,6 +51,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="BizNest Geo-Intelligence API", lifespan=lifespan)
 
+app.middleware("http")(auth_enforcement_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:3001", "http://localhost:3001"],
@@ -57,6 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(files_router, prefix="/files", tags=["files"])
 app.include_router(cities_router, prefix="/cities", tags=["cities"])
@@ -72,8 +76,6 @@ app.include_router(roles_router, prefix="/roles", tags=["roles"])
 app.include_router(user_roles_router, prefix="/user-roles", tags=["user-roles"])
 app.include_router(saved_locations_router, prefix="/saved-locations", tags=["saved-locations"])
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
-
-
 @app.get("/")
 def root():
     return {"message": "BizNest API running"}

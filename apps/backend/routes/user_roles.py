@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from dto.UserRoleDto import UserRoleAssign, UserRoleResponse
+from schema.UserRoleDto import UserRoleAssign, UserRoleResponse
 from models.user import User
 from services import user_role_service
 from services.auth_service import get_authenticated_user

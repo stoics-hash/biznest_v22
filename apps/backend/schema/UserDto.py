@@ -1,19 +1,34 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, constr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
-    username: constr(min_length=3, max_length=50)
-    password: constr(min_length=6)
+    email: EmailStr = Field(..., max_length=254)
+    full_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=100, strip_whitespace=True)
+    ]
+    password: Annotated[
+        str,
+        StringConstraints(
+            min_length=8,
+            max_length=128,
+        )
+    ]
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    email: EmailStr
+    password: Annotated[
+        str,
+        StringConstraints(
+            min_length=8,
+            max_length=128,
+        )
+    ]
 
 
 class RefreshRequest(BaseModel):
@@ -29,7 +44,7 @@ class AuthResponse(BaseModel):
 
     id: UUID
     email: str
-    username: str
+    full_name: str
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -41,7 +56,7 @@ class UserResponse(BaseModel):
 
     id: UUID
     email: EmailStr
-    username: str
+    full_name: str
     is_active: bool
     is_superuser: bool
     created_at: datetime
@@ -63,10 +78,19 @@ class LguInviteResponse(BaseModel):
 class LguRegisterRequest(BaseModel):
     token: str
     email: EmailStr
-    username: constr(min_length=3, max_length=50)
-    password: constr(min_length=6)
+    full_name: Annotated[
+        str,
+        StringConstraints(min_length=2, max_length=100, strip_whitespace=True)
+    ]
+    password: Annotated[
+        str,
+        StringConstraints(
+            min_length=8,
+            max_length=128,
+        )
+    ]
 
 
 class TokenVerifyResponse(BaseModel):
     valid: bool
-    email: str
+    email: EmailStr

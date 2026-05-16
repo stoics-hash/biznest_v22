@@ -10,7 +10,7 @@ function getErrorMessage(err: unknown): string {
 
 export function useLoginForm() {
   const auth = useAuthContext()
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -20,7 +20,7 @@ export function useLoginForm() {
     setError(null)
     setLoading(true)
     try {
-      await auth.signIn(username, password)
+      await auth.signIn(email, password)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -28,5 +28,5 @@ export function useLoginForm() {
     }
   }
 
-  return { username, setUsername, password, setPassword, error, loading, handleSubmit }
+  return { email, setEmail, password, setPassword, error, loading, handleSubmit }
 }

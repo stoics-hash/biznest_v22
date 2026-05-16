@@ -26,6 +26,7 @@ import type {
 } from 'axios';
 
 import type {
+  GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams,
   HTTPValidationError,
   ZoningAreaCreate,
   ZoningAreaResponse,
@@ -375,6 +376,78 @@ export const useRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPost =
       return useMutation(getRegenerateZoningPmtilesCitiesCityIdZoningRegeneratePmtilesPostMutationOptions(options));
     }
     /**
+ * @summary GeoJSON FeatureCollection for Turf.js
+ */
+export const getZoningGeojsonCitiesCityIdZoningGeojsonGet = (
+    cityId: string,
+    params?: GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<unknown>> => {
+
+
+    return axios.default.get(
+      `/cities/${cityId}/zoning/geojson`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+
+
+
+export const getGetZoningGeojsonCitiesCityIdZoningGeojsonGetQueryKey = (cityId: string,
+    params?: GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams,) => {
+    return [
+    `/cities/${cityId}/zoning/geojson`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetZoningGeojsonCitiesCityIdZoningGeojsonGetQueryOptions = <TData = Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string,
+    params?: GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetZoningGeojsonCitiesCityIdZoningGeojsonGetQueryKey(cityId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>> = ({ signal }) => getZoningGeojsonCitiesCityIdZoningGeojsonGet(cityId,params, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetZoningGeojsonCitiesCityIdZoningGeojsonGetQueryResult = NonNullable<Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>>
+export type GetZoningGeojsonCitiesCityIdZoningGeojsonGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary GeoJSON FeatureCollection for Turf.js
+ */
+
+export function useGetZoningGeojsonCitiesCityIdZoningGeojsonGet<TData = Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string,
+    params?: GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningGeojsonCitiesCityIdZoningGeojsonGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetZoningGeojsonCitiesCityIdZoningGeojsonGetQueryOptions(cityId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
  * @summary Get Zoning Area
  */
 export const getZoningAreaCitiesCityIdZoningZoneIdGet = (

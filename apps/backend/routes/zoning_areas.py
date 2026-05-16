@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from dto.ZoningAreaDto import (
+from schema.ZoningAreaDto import (
     ZoningAreaCreate,
     ZoningAreaResponse,
     ZoningAreaUpdate,

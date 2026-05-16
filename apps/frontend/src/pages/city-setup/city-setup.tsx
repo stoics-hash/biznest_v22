@@ -125,7 +125,7 @@ export function CitySetupPage() {
             </div>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome, {user?.username}
+            Welcome, {user?.full_name ?? user?.email}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isInvestor
@@ -189,7 +189,7 @@ export function CitySetupPage() {
                       city={city}
                       joined={true}
                       actionLabel="Enter"
-                      onAction={() => void enterCity(city)}
+                      onAction={() => void enterCity(city.id)}
                     />
                   ))
                 )}

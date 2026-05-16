@@ -3,7 +3,7 @@ import { MapContext, type LightPreset, type ClickedZone } from '@/context/map.co
 import { useCityContext } from '@/context/city.context'
 import { listHazardPmtilesCitiesCityIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
 import { getZoningPmtilesCitiesCityIdZoningPmtilesGet } from '@networking/api/generated/zoning/zoning'
-import type { MapEngine, BoundaryGeometry, HazardTile } from '@/engine/map.engine'
+import type { MapEngine, HazardTile } from '@/engine/map.engine'
 
 // ── PMTile source-layer discovery ────────────────────────────────────────────
 // Reads the PMTile's TileJSON metadata to find the first vector layer id.
@@ -53,7 +53,7 @@ export function MapProvider({ children }: PropsWithChildren) {
   const [visibleZoningTypes, setVisibleZoningTypes] = useState<Set<string> | null>(null)
   const [clickedZone, setClickedZone] = useState<ClickedZone | null>(null)
 
-  const { selectedCity } = useCityContext()
+  const { selectedCity, cityBoundary } = useCityContext()
 
   // Always-current refs so onReady callbacks inside setZoningLayer read latest state.
   const showZoningRef = useRef(showZoning)
@@ -79,8 +79,7 @@ export function MapProvider({ children }: PropsWithChildren) {
   }, [engine, show3D])
 
   // ── City boundary + pan restriction ──────────────────────────────────────
-  // selectedCity already carries the full CityResponse (including boundary),
-  // so no extra API call is needed.
+  // Geometry is fetched separately by CityProvider and exposed as cityBoundary.
 
   useEffect(() => {
     if (!engine) return
@@ -90,12 +89,11 @@ export function MapProvider({ children }: PropsWithChildren) {
       return
     }
 
-    const boundary = selectedCity.boundary as BoundaryGeometry | null
-    if (!boundary) return
+    if (!cityBoundary) return
 
-    engine.flyToCityBoundary(boundary)
-    engine.setCityBoundary(boundary)
-  }, [engine, selectedCity?.id])
+    // fly handled by map.tsx — only set the boundary overlay here
+    engine.setCityBoundary(cityBoundary)
+  }, [engine, selectedCity?.id, cityBoundary])
 
   // ── Hazard PMTile fetch ───────────────────────────────────────────────────
   // 1. Fetch the list of PMTile URLs for the province.

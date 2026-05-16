@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.EstablishmentDto import EstablishmentCreate, EstablishmentUpdate
+from schema.EstablishmentDto import EstablishmentCreate, EstablishmentUpdate
 from models.city import City
 from models.establishment import Establishment
 

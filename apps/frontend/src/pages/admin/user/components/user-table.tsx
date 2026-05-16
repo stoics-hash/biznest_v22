@@ -38,7 +38,7 @@ export function UserTable({ users, onManageRole }: Props) {
         ) : (
           users.map(user => (
             <TableRow key={user.id}>
-              <TableCell className="font-medium">{user.username}</TableCell>
+              <TableCell className="font-medium">{user.full_name ?? user.email}</TableCell>
               <TableCell className="text-muted-foreground">{user.email}</TableCell>
               <TableCell>
                 <Badge variant={user.is_active ? 'default' : 'secondary'}>

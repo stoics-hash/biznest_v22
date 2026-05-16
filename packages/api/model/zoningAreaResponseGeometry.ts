@@ -5,4 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Zone geometry for this zone
+ */
 export type ZoningAreaResponseGeometry = { [key: string]: unknown } | null;

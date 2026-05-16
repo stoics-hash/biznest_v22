@@ -9,10 +9,13 @@ export interface LguRegisterRequest {
   token: string;
   email: string;
   /**
-     * @minLength 3
-     * @maxLength 50
+     * @minLength 2
+     * @maxLength 100
      */
-  username: string;
-  /** @minLength 6 */
+  full_name: string;
+  /**
+     * @minLength 8
+     * @maxLength 128
+     */
   password: string;
 }

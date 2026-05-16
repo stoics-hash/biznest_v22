@@ -26,6 +26,8 @@ import type {
 } from 'axios';
 
 import type {
+  CityGeometryResponse,
+  CitySelectResponse,
   HTTPValidationError,
   InvestorCityAccessCreate,
   InvestorCityAccessResponse
@@ -220,6 +222,133 @@ export function useMyAccessCityAccessMeGet<TData = Awaited<ReturnType<typeof myA
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getMyAccessCityAccessMeGetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
+ * Mint a new access token with city_id embedded. Frontend decodes JWT to read selected city.
+ * @summary Select City
+ */
+export const selectCityCityAccessSelectCityIdPost = (
+    cityId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<CitySelectResponse>> => {
+
+
+    return axios.default.post(
+      `/city-access/select/${cityId}`,undefined,options
+    );
+  }
+
+
+
+export const getSelectCityCityAccessSelectCityIdPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof selectCityCityAccessSelectCityIdPost>>, TError,{cityId: string}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof selectCityCityAccessSelectCityIdPost>>, TError,{cityId: string}, TContext> => {
+
+const mutationKey = ['selectCityCityAccessSelectCityIdPost'];
+const {mutation: mutationOptions, axios: axiosOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, axios: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof selectCityCityAccessSelectCityIdPost>>, {cityId: string}> = (props) => {
+          const {cityId} = props ?? {};
+
+          return  selectCityCityAccessSelectCityIdPost(cityId,axiosOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SelectCityCityAccessSelectCityIdPostMutationResult = NonNullable<Awaited<ReturnType<typeof selectCityCityAccessSelectCityIdPost>>>
+
+    export type SelectCityCityAccessSelectCityIdPostMutationError = AxiosError<HTTPValidationError>
+
+    /**
+ * @summary Select City
+ */
+export const useSelectCityCityAccessSelectCityIdPost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof selectCityCityAccessSelectCityIdPost>>, TError,{cityId: string}, TContext>, axios?: AxiosRequestConfig}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof selectCityCityAccessSelectCityIdPost>>,
+        TError,
+        {cityId: string},
+        TContext
+      > => {
+      return useMutation(getSelectCityCityAccessSelectCityIdPostMutationOptions(options));
+    }
+    /**
+ * Return only the boundary GeoJSON for a city. Cached in Redis for 1 hour.
+ * @summary City Geometry
+ */
+export const cityGeometryCityAccessCityIdGeometryGet = (
+    cityId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<CityGeometryResponse>> => {
+
+
+    return axios.default.get(
+      `/city-access/${cityId}/geometry`,options
+    );
+  }
+
+
+
+
+export const getCityGeometryCityAccessCityIdGeometryGetQueryKey = (cityId: string,) => {
+    return [
+    `/city-access/${cityId}/geometry`
+    ] as const;
+    }
+
+
+export const getCityGeometryCityAccessCityIdGeometryGetQueryOptions = <TData = Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCityGeometryCityAccessCityIdGeometryGetQueryKey(cityId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>> = ({ signal }) => cityGeometryCityAccessCityIdGeometryGet(cityId, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CityGeometryCityAccessCityIdGeometryGetQueryResult = NonNullable<Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>>
+export type CityGeometryCityAccessCityIdGeometryGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary City Geometry
+ */
+
+export function useCityGeometryCityAccessCityIdGeometryGet<TData = Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof cityGeometryCityAccessCityIdGeometryGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCityGeometryCityAccessCityIdGeometryGetQueryOptions(cityId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

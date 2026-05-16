@@ -11,7 +11,7 @@ function getErrorMessage(err: unknown): string {
 export function useRegisterForm() {
   const auth = useAuthContext()
   const [email, setEmail] = useState('')
-  const [username, setUsername] = useState('')
+  const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -21,7 +21,7 @@ export function useRegisterForm() {
     setError(null)
     setLoading(true)
     try {
-      await auth.register(email, username, password)
+      await auth.register(email, fullName, password)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -29,5 +29,5 @@ export function useRegisterForm() {
     }
   }
 
-  return { email, setEmail, username, setUsername, password, setPassword, error, loading, handleSubmit }
+  return { email, setEmail, fullName, setFullName, password, setPassword, error, loading, handleSubmit }
 }

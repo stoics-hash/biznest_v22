@@ -45,7 +45,7 @@ def _sign(data: bytes, key: str, algorithm: str) -> bytes:
 def create_jwt(payload: dict, key: str, algorithm: str = "HS256") -> str:
     header_b64 = _b64url_json({"alg": algorithm, "typ": "JWT"})
     payload_b64 = _b64url_json(payload)
-    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
     signature = _b64url(_sign(signing_input, key, algorithm))
     return f"{header_b64}.{payload_b64}.{signature}"
 

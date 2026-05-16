@@ -1,5 +1,6 @@
 import io
 import uuid
+from datetime import timedelta
 
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -7,7 +8,7 @@ from minio.error import S3Error
 from sqlalchemy.orm import Session
 
 from core.minio_client import minio_client, BUCKET_NAME
-from dto.DocumentDto import DocumentUploadResponse
+from schema.DocumentDto import DocumentUploadResponse, PresignedUrlResponse
 from models.document import Document
 from models.user import User
 
@@ -63,4 +64,44 @@ def download_file(file_id: str) -> StreamingResponse:
         iterfile(),
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def get_presigned_url(file_id: str, expires_hours: int = 1) -> PresignedUrlResponse:
+    """
+    Generate a presigned URL for a file in MinIO.
+
+    The presigned URL allows direct access to the file without requiring
+    server-side streaming. Useful for frontend downloads.
+
+    Args:
+        file_id: MinIO object key
+        expires_hours: URL validity duration (default 1 hour)
+
+    Returns:
+        PresignedUrlResponse with the presigned URL and expiration time
+
+    Raises:
+        HTTPException: 404 if file not found in MinIO
+    """
+    try:
+        # Verify file exists
+        minio_client.stat_object(BUCKET_NAME, file_id)
+    except S3Error:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    expires_delta = timedelta(hours=expires_hours)
+    expires_seconds = int(expires_delta.total_seconds())
+
+    presigned_url = minio_client.get_presigned_url(
+        method="GET",
+        bucket_name=BUCKET_NAME,
+        object_name=file_id,
+        expires=expires_delta,
+    )
+
+    return PresignedUrlResponse(
+        file_id=file_id,
+        presigned_url=presigned_url,
+        expires_in_seconds=expires_seconds,
     )
