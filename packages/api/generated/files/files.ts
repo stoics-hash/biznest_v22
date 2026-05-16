@@ -28,7 +28,9 @@ import type {
 import type {
   BodyUploadFileFilesUploadPost,
   DocumentUploadResponse,
-  HTTPValidationError
+  GetPresignedUrlFilesFileIdPresignedGetParams,
+  HTTPValidationError,
+  PresignedUrlResponse
 } from '../../model';
 
 
@@ -156,6 +158,85 @@ export function useDownloadFileFilesFileIdGet<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getDownloadFileFilesFileIdGetQueryOptions(fileId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
+ * Get a presigned URL for direct MinIO file access.
+
+The returned URL allows direct downloads from MinIO without requiring
+this API to stream the file. Useful for large files or frontend integrations.
+
+Query parameters:
+- expires_hours: URL validity duration in hours (default 1, max 24)
+ * @summary Get Presigned Url
+ */
+export const getPresignedUrlFilesFileIdPresignedGet = (
+    fileId: string,
+    params?: GetPresignedUrlFilesFileIdPresignedGetParams, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<PresignedUrlResponse>> => {
+
+
+    return axios.default.get(
+      `/files/${fileId}/presigned`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+
+
+
+export const getGetPresignedUrlFilesFileIdPresignedGetQueryKey = (fileId: string,
+    params?: GetPresignedUrlFilesFileIdPresignedGetParams,) => {
+    return [
+    `/files/${fileId}/presigned`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPresignedUrlFilesFileIdPresignedGetQueryOptions = <TData = Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>, TError = AxiosError<HTTPValidationError>>(fileId: string,
+    params?: GetPresignedUrlFilesFileIdPresignedGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPresignedUrlFilesFileIdPresignedGetQueryKey(fileId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>> = ({ signal }) => getPresignedUrlFilesFileIdPresignedGet(fileId,params, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(fileId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPresignedUrlFilesFileIdPresignedGetQueryResult = NonNullable<Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>>
+export type GetPresignedUrlFilesFileIdPresignedGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary Get Presigned Url
+ */
+
+export function useGetPresignedUrlFilesFileIdPresignedGet<TData = Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>, TError = AxiosError<HTTPValidationError>>(
+ fileId: string,
+    params?: GetPresignedUrlFilesFileIdPresignedGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPresignedUrlFilesFileIdPresignedGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPresignedUrlFilesFileIdPresignedGetQueryOptions(fileId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

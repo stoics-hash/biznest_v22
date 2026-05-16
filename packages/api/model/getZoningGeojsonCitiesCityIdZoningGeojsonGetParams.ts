@@ -5,9 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListCitiesCitiesGetParams = {
+export type GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams = {
 /**
- * Include boundary GeoJSON (expensive — omit for name-only lists)
+ * minLng,minLat,maxLng,maxLat — spatial filter
  */
-include_geometry?: boolean;
+bbox?: string | null;
 };

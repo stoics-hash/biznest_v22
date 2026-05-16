@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from dto.HazardAreaDto import HazardAreaCreate, HazardAreaResponse, HazardAreaSummary, HazardAreaUpdate, HazardPmtileResponse
+from schema.HazardAreaDto import HazardAreaCreate, HazardAreaResponse, HazardAreaSummary, HazardAreaUpdate, HazardPmtileResponse
 from models.user import User
 from services import hazard_area_service
 from services.auth_service import get_authenticated_user

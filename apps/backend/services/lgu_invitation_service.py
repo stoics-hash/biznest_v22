@@ -6,7 +6,7 @@ from fastapi import HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from core.db import ACCESS_TOKEN_EXPIRE_SECONDS
-from dto.UserDto import AuthResponse, LguInviteRequest, LguInviteResponse, LguRegisterRequest
+from schema.UserDto import AuthResponse, LguInviteRequest, LguInviteResponse, LguRegisterRequest
 from models.city import City
 from models.lgu_assignment import LguAssignment
 from models.lgu_invitation import LguInvitation
@@ -106,15 +106,15 @@ def verify_invitation(token: str, email: str, db: Session) -> dict:
 def register_from_token(payload: LguRegisterRequest, response: Response, db: Session) -> AuthResponse:
     invitation = _get_valid_invitation(payload.token, payload.email, db)
 
-    if db.query(User).filter((User.username == payload.username) | (User.email == payload.email)).first():
+    if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="User with given username or email already exists",
+            detail="User with given email already exists",
         )
 
     user = User(
         email=payload.email,
-        username=payload.username,
+        full_name=payload.full_name,
         hashed_password=hash_password(payload.password),
         is_active=True,
         is_superuser=False,

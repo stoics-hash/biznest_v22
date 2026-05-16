@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from dto.EstablishmentDto import EstablishmentCreate, EstablishmentResponse, EstablishmentUpdate
+from schema.EstablishmentDto import EstablishmentCreate, EstablishmentResponse, EstablishmentUpdate
 from models.user import User
 from services import establishment_service
 from services.auth_service import get_authenticated_user

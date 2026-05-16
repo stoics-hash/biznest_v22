@@ -6,8 +6,12 @@
  */
 
 export interface GroundControlPoint {
+  /** Pixel X coordinate in the image */
   pixel_x: number;
+  /** Pixel Y coordinate in the image */
   pixel_y: number;
+  /** Longitude of the GCP in WGS84 coordinate system */
   longitude: number;
+  /** Latitude of the GCP in WGS84 coordinate system */
   latitude: number;
 }

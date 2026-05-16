@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.LguAssignmentDto import LguAssignmentCreate
+from schema.LguAssignmentDto import LguAssignmentCreate
 from models.city import City
 from models.lgu_assignment import LguAssignment
 

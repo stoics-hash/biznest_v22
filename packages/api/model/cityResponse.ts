@@ -4,8 +4,10 @@
  * BizNest Geo-Intelligence API
  * OpenAPI spec version: 0.1.0
  */
-import type { CityResponseBoundary } from './cityResponseBoundary';
 
+/**
+ * City metadata — never includes geometry. Fetch geometry via /geometry endpoint.
+ */
 export interface CityResponse {
   id: string;
   name: string;
@@ -13,6 +15,5 @@ export interface CityResponse {
   region: string | null;
   province_id: string | null;
   pmtile_url: string | null;
-  boundary: CityResponseBoundary;
   created_at: string;
 }

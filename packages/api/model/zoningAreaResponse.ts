@@ -4,15 +4,23 @@
  * BizNest Geo-Intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { ZoneType } from './zoneType';
 import type { ZoningAreaResponseGeometry } from './zoningAreaResponseGeometry';
 
 export interface ZoningAreaResponse {
+  /** Zoning Area Id */
   id: string;
+  /** City Id */
   city_id: string;
-  zone_type: string | null;
+  /** Zone type for this zone */
+  zone_type?: ZoneType | null;
+  /** Hex color code for this zone, e.g. #RRGGBB */
   color_hex: string | null;
-  geometry: ZoningAreaResponseGeometry;
+  /** Zone geometry for this zone */
+  geometry?: ZoningAreaResponseGeometry;
+  /** Presigned MinIO URL for city-level zoning PMTile, if available */
   pmtile_url: string | null;
-  created_by: string | null;
+  /** Created by user for this zone */
+  created_by: string;
   created_at: string;
 }

@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from dto.InvestorSubscriptionDto import (
+from schema.InvestorSubscriptionDto import (
     InvestorSubscriptionCreate,
     InvestorSubscriptionResponse,
     InvestorSubscriptionUpdate,

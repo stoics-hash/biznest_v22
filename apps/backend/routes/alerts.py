@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from dto.AlertDto import AlertCreate, AlertResponse, AlertUpdate
+from schema.AlertDto import AlertCreate, AlertResponse, AlertUpdate
 from models.user import User
 from services import alert_service
 from services.auth_service import get_authenticated_user

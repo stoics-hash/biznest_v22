@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.minio_client import BUCKET_NAME, minio_client
-from dto.HazardAreaDto import HazardAreaCreate, HazardAreaUpdate, HazardPmtileResponse
+from schema.HazardAreaDto import HazardAreaCreate, HazardAreaUpdate, HazardPmtileResponse
 from models.hazard_area import HazardArea
 
 _PMTILE_URL_TTL = timedelta(hours=5)

@@ -3,8 +3,8 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.PermissionDto import PermissionResponse
-from dto.RoleDto import RoleCreate, RoleWithPermissionsResponse
+from schema.PermissionDto import PermissionResponse
+from schema.RoleDto import RoleCreate, RoleWithPermissionsResponse
 from models.permission import Permission
 from models.role import Role
 from models.role_permission import RolePermission

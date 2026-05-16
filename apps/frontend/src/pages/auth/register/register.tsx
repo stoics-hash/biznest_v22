@@ -23,8 +23,8 @@ export function RegisterPage() {
         <RegisterForm
           email={form.email}
           setEmail={form.setEmail}
-          username={form.username}
-          setUsername={form.setUsername}
+          fullName={form.fullName}
+          setFullName={form.setFullName}
           password={form.password}
           setPassword={form.setPassword}
           error={form.error}

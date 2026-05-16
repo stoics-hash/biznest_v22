@@ -7,20 +7,19 @@ from fastapi import HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, REFRESH_TOKEN_EXPIRE_SECONDS, SECRET_KEY
-from dto.UserDto import AuthResponse, LoginRequest, RegisterRequest, UserResponse
+from schema.UserDto import AuthResponse, LoginRequest, RegisterRequest, UserResponse
 from models.investor_subscription import InvestorSubscription
 from models.refresh_token import RefreshToken
 from models.role import Role
 from models.subscription_plan import SubscriptionPlan
 from models.user import User
 from models.user_role import UserRole
-from services.auth_service import (
+from core.security import (
     USER_CACHE_KEY,
     USER_CACHE_TTL,
     _pack_user,
     clear_auth_cookie,
     clear_refresh_cookie,
-    set_auth_cookie,
     set_refresh_cookie,
     user_to_cache_dict,
 )
@@ -46,15 +45,13 @@ def _invalidate_user_cache(user_id, rc: redis_lib.Redis | None) -> None:
 
 
 def register(payload: RegisterRequest, response: Response, db: Session, rc: redis_lib.Redis | None = None) -> AuthResponse:
-    existing = db.query(User).filter(
-        (User.username == payload.username) | (User.email == payload.email)
-    ).first()
+    existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
-        raise HTTPException(status_code=400, detail="User with given username or email already exists")
+        raise HTTPException(status_code=400, detail="User with given email already exists")
 
     user = User(
         email=payload.email,
-        username=payload.username,
+        full_name=payload.full_name,
         hashed_password=hash_password(payload.password),
         is_active=True,
         is_superuser=False,
@@ -80,7 +77,7 @@ def register(payload: RegisterRequest, response: Response, db: Session, rc: redi
 
 def login(payload: LoginRequest, response: Response, db: Session, rc: redis_lib.Redis | None = None) -> AuthResponse:
     # Password verification always hits DB — never use cached user for auth checks
-    user = db.query(User).filter(User.username == payload.username).first()
+    user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_active:
@@ -160,7 +157,6 @@ def create_auth_session(user: User, response: Response, db: Session) -> tuple[st
     access_token = create_jwt(
         {
             "sub": str(user.id),
-            "username": user.username,
             "email": user.email,
             "iat": now,
             "exp": now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
@@ -177,7 +173,6 @@ def create_auth_session(user: User, response: Response, db: Session) -> tuple[st
     ))
     db.commit()
 
-    set_auth_cookie(response, access_token)
     set_refresh_cookie(response, raw_refresh)
     return access_token, raw_refresh
 
@@ -186,7 +181,7 @@ def _auth_response(user: User, access_token: str, refresh_token: str) -> AuthRes
     return AuthResponse(
         id=user.id,
         email=user.email,
-        username=user.username,
+        full_name=user.full_name,
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",

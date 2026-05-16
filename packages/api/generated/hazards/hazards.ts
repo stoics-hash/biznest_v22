@@ -26,6 +26,7 @@ import type {
 } from 'axios';
 
 import type {
+  GetHazardGeojsonCitiesCityIdHazardsGeojsonGetParams,
   HTTPValidationError,
   HazardAreaCreate,
   HazardAreaSummary,
@@ -242,6 +243,78 @@ export const useCreateHazardAreaCitiesCityIdHazardsPost = <TError = AxiosError<H
       return useMutation(getCreateHazardAreaCitiesCityIdHazardsPostMutationOptions(options));
     }
     /**
+ * @summary GeoJSON FeatureCollection for Turf.js
+ */
+export const getHazardGeojsonCitiesCityIdHazardsGeojsonGet = (
+    cityId: string,
+    params?: GetHazardGeojsonCitiesCityIdHazardsGeojsonGetParams, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<unknown>> => {
+
+
+    return axios.default.get(
+      `/cities/${cityId}/hazards/geojson`,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+
+
+
+export const getGetHazardGeojsonCitiesCityIdHazardsGeojsonGetQueryKey = (cityId: string,
+    params?: GetHazardGeojsonCitiesCityIdHazardsGeojsonGetParams,) => {
+    return [
+    `/cities/${cityId}/hazards/geojson`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetHazardGeojsonCitiesCityIdHazardsGeojsonGetQueryOptions = <TData = Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string,
+    params?: GetHazardGeojsonCitiesCityIdHazardsGeojsonGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHazardGeojsonCitiesCityIdHazardsGeojsonGetQueryKey(cityId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>> = ({ signal }) => getHazardGeojsonCitiesCityIdHazardsGeojsonGet(cityId,params, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHazardGeojsonCitiesCityIdHazardsGeojsonGetQueryResult = NonNullable<Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>>
+export type GetHazardGeojsonCitiesCityIdHazardsGeojsonGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary GeoJSON FeatureCollection for Turf.js
+ */
+
+export function useGetHazardGeojsonCitiesCityIdHazardsGeojsonGet<TData = Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string,
+    params?: GetHazardGeojsonCitiesCityIdHazardsGeojsonGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardGeojsonCitiesCityIdHazardsGeojsonGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHazardGeojsonCitiesCityIdHazardsGeojsonGetQueryOptions(cityId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
  * @summary Get Hazard Area
  */
 export const getHazardAreaCitiesCityIdHazardsHazardIdGet = (

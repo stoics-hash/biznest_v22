@@ -7,8 +7,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
 
 interface LoginFormProps {
-  username: string
-  setUsername: Dispatch<SetStateAction<string>>
+  email: string
+  setEmail: Dispatch<SetStateAction<string>>
   password: string
   setPassword: Dispatch<SetStateAction<string>>
   error: string | null
@@ -17,8 +17,8 @@ interface LoginFormProps {
 }
 
 export function LoginForm({
-  username,
-  setUsername,
+  email,
+  setEmail,
   password,
   setPassword,
   error,
@@ -42,15 +42,15 @@ export function LoginForm({
         )}
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
-            id="username"
-            type="text"
-            placeholder="username"
-            autoComplete="username"
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            autoComplete="email"
             required
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            value={email}
+            onChange={e => setEmail(e.target.value)}
           />
         </div>
 

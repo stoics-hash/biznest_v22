@@ -1,14 +1,14 @@
 from uuid import UUID
 
 import redis as redis_lib
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from core.redis import get_redis
-from dto.CityDto import CityCreate, CityResponse, CityUpdate
+from core.security import get_authenticated_user
+from schema.CityDto import CityCreate, CityGeometryResponse, CityResponse, CityUpdate
 from models.user import User
 from services import city_service
-from services.auth_service import get_authenticated_user
 from utils.jwtUtils import get_db
 
 router = APIRouter()
@@ -16,11 +16,10 @@ router = APIRouter()
 
 @router.get("/", response_model=list[CityResponse])
 def list_cities(
-    include_geometry: bool = Query(False, description="Include boundary GeoJSON (expensive — omit for name-only lists)"),
     db: Session = Depends(get_db),
     rc: redis_lib.Redis = Depends(get_redis),
 ):
-    return city_service.get_all(db, rc, include_geometry)
+    return city_service.get_all(db, rc)
 
 
 @router.post("/", response_model=CityResponse, status_code=status.HTTP_201_CREATED)
@@ -35,12 +34,22 @@ def create_city(
 @router.get("/{city_id}", response_model=CityResponse)
 def get_city(
     city_id: UUID,
-    include_geometry: bool = Query(False, description="Include boundary GeoJSON"),
     db: Session = Depends(get_db),
     rc: redis_lib.Redis = Depends(get_redis),
 ):
-    return city_service.get_or_404(city_id, db, rc, include_geometry)
+    return city_service.get_or_404(city_id, db, rc)
 
+
+@router.get("/{city_id}/geometry", response_model=CityGeometryResponse)
+def get_city_geometry(
+    city_id: UUID,
+    db: Session = Depends(get_db),
+    rc: redis_lib.Redis = Depends(get_redis),
+    _: User = Depends(get_authenticated_user),
+):
+    """Return only boundary GeoJSON. Cached in Redis for 1 hour."""
+    geometry = city_service.get_city_geometry(city_id, db, rc)
+    return CityGeometryResponse(id=city_id, boundary=geometry)
 
 @router.patch("/{city_id}", response_model=CityResponse)
 def update_city(

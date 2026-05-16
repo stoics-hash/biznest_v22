@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from dto.PermissionDto import PermissionCreate, PermissionResponse
+from schema.PermissionDto import PermissionCreate, PermissionResponse
 from models.user import User
 from services import permission_service
 from services.auth_service import get_authenticated_user

@@ -21,8 +21,8 @@ export function LoginPage() {
         </Link>
 
         <LoginForm
-          username={form.username}
-          setUsername={form.setUsername}
+          email={form.email}
+          setEmail={form.setEmail}
           password={form.password}
           setPassword={form.setPassword}
           error={form.error}

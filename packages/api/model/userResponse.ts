@@ -8,7 +8,7 @@
 export interface UserResponse {
   id: string;
   email: string;
-  username: string;
+  full_name: string;
   is_active: boolean;
   is_superuser: boolean;
   created_at: string;

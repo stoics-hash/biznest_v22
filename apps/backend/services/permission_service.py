@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.PermissionDto import PermissionCreate
+from schema.PermissionDto import PermissionCreate
 from models.permission import Permission
 
 

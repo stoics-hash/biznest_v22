@@ -8,7 +8,7 @@
 export interface AuthResponse {
   id: string;
   email: string;
-  username: string;
+  full_name: string;
   access_token: string;
   refresh_token: string;
   token_type?: string;

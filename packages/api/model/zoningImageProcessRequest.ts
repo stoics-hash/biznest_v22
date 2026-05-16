@@ -7,6 +7,7 @@
 import type { GroundControlPoint } from './groundControlPoint';
 
 export interface ZoningImageProcessRequest {
+  /** Image File ID */
   file_id: string;
   gcps: GroundControlPoint[];
   n_colors?: number;

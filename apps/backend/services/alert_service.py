@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.AlertDto import AlertCreate, AlertUpdate
+from schema.AlertDto import AlertCreate, AlertUpdate
 from models.alert import Alert
 from models.city import City
 

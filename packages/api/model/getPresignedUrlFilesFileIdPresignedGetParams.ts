@@ -5,9 +5,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetCityCitiesCityIdGetParams = {
-/**
- * Include boundary GeoJSON
- */
-include_geometry?: boolean;
+export type GetPresignedUrlFilesFileIdPresignedGetParams = {
+expires_hours?: number;
 };

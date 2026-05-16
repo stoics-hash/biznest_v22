@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from dto.UserRoleDto import UserRoleAssign
+from schema.UserRoleDto import UserRoleAssign
 from models.role import Role
 from models.user import User
 from models.user_role import UserRole

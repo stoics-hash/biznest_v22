@@ -2,7 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from dto.RoleDto import RoleResponse
+from schema.RoleDto import RoleResponse
 
 
 class UserRoleAssign(BaseModel):

@@ -4,9 +4,12 @@
  * BizNest Geo-Intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { ZoneType } from './zoneType';
 import type { ZoningAreaUpdateGeometry } from './zoningAreaUpdateGeometry';
 
 export interface ZoningAreaUpdate {
-  zone_type?: string | null;
+  /** Zone type for this zone */
+  zone_type?: ZoneType | null;
+  /** Zone geometry for this zone */
   geometry?: ZoningAreaUpdateGeometry;
 }

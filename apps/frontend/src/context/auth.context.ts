@@ -11,7 +11,9 @@ export type AuthAction =
       permissions: string[]
       city_ids: string[]
       lgu_city?: CityResponse
+      city_id?: string
     }
+  | { type: 'SET_CITY'; city_id: string }
   | { type: 'UNAUTHENTICATED' }
   | { type: 'SIGN_OUT' }
 
@@ -25,16 +27,18 @@ export type AuthState =
       permissions: string[]
       city_ids: string[]
       lgu_city?: CityResponse
+      city_id?: string
     }
   | { state: 'UNAUTHENTICATED' }
   | { state: 'SIGNING_OUT' }
 
 export interface AuthData {
   state: AuthState
-  signIn: (username: string, password: string) => Promise<void>
-  register: (email: string, username: string, password: string, role?: 'investor' | 'lgu_admin') => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
+  register: (email: string, full_name: string, password: string, role?: 'investor' | 'lgu_admin') => Promise<void>
   signOut: () => Promise<void>
   refreshCities: () => Promise<void>
+  selectCity: (cityId: string) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthData>({
@@ -43,6 +47,7 @@ export const AuthContext = createContext<AuthData>({
   register: async () => {},
   signOut: async () => {},
   refreshCities: async () => {},
+  selectCity: async () => {},
 })
 
 export const useAuthContext = () => useContext(AuthContext)

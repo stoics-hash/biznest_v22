@@ -6,6 +6,8 @@
  */
 
 export interface ZoningPmtilesResponse {
+  /** Presigned MinIO URL for city-level zoning PMTile */
   pmtile_url: string;
+  /** MinIO object key for city-level zoning PMTile */
   object_key: string;
 }

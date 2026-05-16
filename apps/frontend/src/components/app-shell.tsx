@@ -207,12 +207,12 @@ export function AppShell() {
           <SidebarFooter>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton size="lg" tooltip={user.username} className="cursor-default">
+                <SidebarMenuButton size="lg" tooltip={user.full_name ?? user.email} className="cursor-default">
                   <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground text-xs font-semibold">
-                    {user.username.slice(0, 2).toUpperCase()}
+                    {(user.full_name ?? user.email).slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex min-w-0 flex-col text-left leading-tight">
-                    <span className="truncate text-sm font-medium">{user.username}</span>
+                    <span className="truncate text-sm font-medium">{user.full_name ?? user.email}</span>
                     {role_name && (
                       <span className="truncate text-xs text-sidebar-foreground/60 capitalize">
                         {role_name.replace('_', ' ')}

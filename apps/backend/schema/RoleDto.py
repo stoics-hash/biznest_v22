@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from dto.PermissionDto import PermissionResponse
+from schema.PermissionDto import PermissionResponse
 
 
 class RoleCreate(BaseModel):
