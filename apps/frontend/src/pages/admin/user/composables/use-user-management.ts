@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { allUsersUsersGet } from '@networking/api/generated/users/users'
+import { useAllUsersUsersGet } from '@networking/api/generated/users/users'
 import { listRolesRolesGet } from '@networking/api/generated/roles/roles'
 import {
   assignRoleUserRolesPost,
@@ -10,10 +10,8 @@ import {
 export function useUserManagement() {
   const queryClient = useQueryClient()
 
-  const { data: users = [], isLoading: usersLoading } = useQuery({
-    queryKey: ['/users/'],
-    queryFn: () => allUsersUsersGet().then(r => r.data),
-  })
+  const { data: usersData, isLoading: usersLoading } = useAllUsersUsersGet()
+  const users = usersData?.data ?? []
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ['/roles/'],

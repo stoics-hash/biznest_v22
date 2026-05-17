@@ -31,6 +31,8 @@ _PUBLIC_PREFIXES: tuple[str, ...] = (
     "/openapi",
     "/files/",
     "/cities/",   # city sub-resources (zoning, establishments, alerts) have their own auth deps
+    "/regions/",
+    "/provinces/",
 )
 
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Check, Link2, Mail, Building2 } from 'lucide-react'
+import { Copy, Check, Link2, Mail } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -13,13 +13,12 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
 import {
-  Combobox,
-  ComboboxInput,
-  ComboboxContent,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxEmpty,
-} from '@/components/ui/combobox'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useLguInvite } from '../composables/use-lgu-invite'
 
 interface LguInviteDialogProps {
@@ -47,7 +46,11 @@ function CopyButton({ text }: { text: string }) {
 export function LguInviteDialog({ open, onOpenChange }: LguInviteDialogProps) {
   const {
     email, setEmail,
+    regionId, setRegionId,
+    provinceId, setProvinceId,
     cityId, setCityId,
+    regions, regionsLoading,
+    provinces, provincesLoading,
     cities, citiesLoading,
     sending, error, success, result,
     handleSubmit, reset,
@@ -116,37 +119,66 @@ export function LguInviteDialog({ open, onOpenChange }: LguInviteDialogProps) {
             </div>
 
             <div className="space-y-1.5">
+              <Label>Region</Label>
+              <Select
+                value={regionId ?? ''}
+                onValueChange={val => setRegionId(val || null)}
+                disabled={regionsLoading}
+              >
+                <SelectTrigger className="w-full">
+                  {regionsLoading
+                    ? <span className="flex items-center gap-2 text-muted-foreground"><Spinner className="size-3.5" /> Loading…</span>
+                    : <SelectValue placeholder="Select region" />
+                  }
+                </SelectTrigger>
+                <SelectContent>
+                  {regions.map(r => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Province</Label>
+              <Select
+                value={provinceId ?? ''}
+                onValueChange={val => setProvinceId(val || null)}
+                disabled={!regionId || provincesLoading}
+              >
+                <SelectTrigger className="w-full">
+                  {provincesLoading
+                    ? <span className="flex items-center gap-2 text-muted-foreground"><Spinner className="size-3.5" /> Loading…</span>
+                    : <SelectValue placeholder="Select province" />
+                  }
+                </SelectTrigger>
+                <SelectContent>
+                  {provinces.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
               <Label>City</Label>
-              {citiesLoading ? (
-                <div className="flex h-9 items-center gap-2 text-sm text-muted-foreground">
-                  <Spinner className="size-4" /> Loading cities…
-                </div>
-              ) : (
-                <Combobox
-                  value={cityId}
-                  onValueChange={val => setCityId(val as string | null)}
-                >
-                  <ComboboxInput
-                    placeholder="Search city…"
-                    showClear={!!cityId}
-                    className="w-full"
-                  />
-                  <ComboboxContent>
-                    <ComboboxList>
-                      <ComboboxEmpty>No cities found.</ComboboxEmpty>
-                      {cities.map(city => (
-                        <ComboboxItem key={city.id} value={city.id} label={city.name}>
-                          <Building2 className="size-4 text-muted-foreground" />
-                          <span>{city.name}</span>
-                          {city.province && (
-                            <span className="ml-auto text-xs text-muted-foreground">{city.province}</span>
-                          )}
-                        </ComboboxItem>
-                      ))}
-                    </ComboboxList>
-                  </ComboboxContent>
-                </Combobox>
-              )}
+              <Select
+                value={cityId ?? ''}
+                onValueChange={val => setCityId(val || null)}
+                disabled={!provinceId || citiesLoading}
+              >
+                <SelectTrigger className="w-full">
+                  {citiesLoading
+                    ? <span className="flex items-center gap-2 text-muted-foreground"><Spinner className="size-3.5" /> Loading…</span>
+                    : <SelectValue placeholder="Select city" />
+                  }
+                </SelectTrigger>
+                <SelectContent>
+                  {cities.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <Button

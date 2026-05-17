@@ -20,14 +20,26 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3001")
 LGU_INVITE_EXPIRE_HOURS = int(os.environ.get("LGU_INVITE_EXPIRE_HOURS", "24"))
 
 
-def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) -> LguInviteResponse:
-    if not created_by.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superuser access required")
+def _require_admin(user: User, db: Session) -> None:
+    from models.role import Role
+    has_admin = (
+        db.query(UserRole)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(UserRole.user_id == user.id, Role.name == "admin")
+        .first()
+    ) is not None
+    if not has_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
-    if not db.query(City).filter(City.id == payload.city_id).first():
+
+def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) -> LguInviteResponse:
+    _require_admin(created_by, db)
+
+    city = db.query(City).filter(City.id == payload.city_id).first()
+    if not city:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="City not found")
 
-    if db.query(LguAssignment).filter(LguAssignment.city_id == payload.city_id).first():
+    if db.query(LguAssignment).filter(LguAssignment.city_id == city.id).first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="City already has an assigned LGU admin",
@@ -58,7 +70,7 @@ def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) 
     existing_city_invite = (
         db.query(LguInvitation)
         .filter(
-            LguInvitation.city_id == payload.city_id,
+            LguInvitation.city_id == city.id,
             LguInvitation.used_at.is_(None),
             LguInvitation.expires_at > datetime.now(timezone.utc),
         )
@@ -76,7 +88,7 @@ def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) 
     invitation = LguInvitation(
         email=payload.email,
         token=token,
-        city_id=payload.city_id,
+        city_id=city.id,
         expires_at=expires_at,
         created_by_id=created_by.id,
     )
@@ -93,7 +105,7 @@ def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) 
     return LguInviteResponse(
         message="Invitation sent",
         magic_link=magic_link,
-        city_id=payload.city_id,
+        city_id=city.id,
         expires_at=expires_at,
     )
 
@@ -133,8 +145,8 @@ def register_from_token(payload: LguRegisterRequest, response: Response, db: Ses
     db.refresh(user)
 
     from services.user_service import create_auth_session, _auth_response
-    access_token, raw_refresh = create_auth_session(user, response, db)
-    return _auth_response(user, access_token, raw_refresh)
+    access_token, _ = create_auth_session(user, response, db)
+    return _auth_response(user, access_token)
 
 
 def _get_valid_invitation(token: str, email: str, db: Session) -> LguInvitation:

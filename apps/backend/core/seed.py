@@ -75,7 +75,6 @@ ROLES = {
         "location:save",
         "manage:user",
         "manage:role",
-        "view:map",
         "manage:subscription",
         "manage:logs",
     ],

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import redis as redis_lib
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from core.redis import get_redis
@@ -16,9 +16,12 @@ router = APIRouter()
 
 @router.get("/", response_model=list[CityResponse])
 def list_cities(
+    q: str | None = Query(None, description="Search by city name or province"),
     db: Session = Depends(get_db),
     rc: redis_lib.Redis = Depends(get_redis),
 ):
+    if q:
+        return city_service.search(q, db)
     return city_service.get_all(db, rc)
 
 

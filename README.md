@@ -111,43 +111,10 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment
-
-Create `.env` at `apps/backend/.env` (or repo root — python-dotenv searches upward):
-
-```env
-# Required
-DATABASE_URL=postgresql+pg8000://fastapi:fastapi@localhost:5433/fastapi
-SECRET_KEY=your-secret-key-here
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=minio
-MINIO_SECRET_KEY=minio123
-
-# Optional — defaults shown
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_SECONDS=900
-REFRESH_TOKEN_EXPIRE_SECONDS=604800
-JWT_COOKIE_NAME=ACCESS_TOKEN
-REFRESH_COOKIE_NAME=REFRESH_TOKEN
-SECURE_COOKIES=false
-FRONTEND_URL=http://localhost:3001
-LGU_INVITE_EXPIRE_HOURS=24
-
-# Email — LGU invites silently disabled when unset
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASSWORD=
-SMTP_FROM=
-
-# Seed scripts only
-HUGGING_FACE_TOKEN=your_hf_token
-```
-
-### 4. Run the server
+### 3. Run the server
 
 ```bash
-uvicorn main:app --reload
+fastapi dev ./main.py
 # → http://localhost:8000/docs
 ```
 
@@ -165,12 +132,6 @@ All commands run from `apps/backend/`.
 
 ```bash
 alembic upgrade head
-```
-
-### Create a new migration
-
-```bash
-alembic revision --autogenerate -m "describe your change"
 ```
 
 > **Warning — Tiger geocoder tables**: PostGIS installs ~30 Tiger geocoder extension tables. Alembic autogenerate will include `drop_table` statements for all of them in every generated migration. **Always open the generated file and delete those drop_table calls before running the migration.** Look for tables like `tiger.*`, `topology.*`, `address_standardizer*`, etc.
@@ -199,7 +160,6 @@ alembic current
 ---
 
 ## Tippecanoe setup (WSL2)
-
 Tippecanoe converts GeoJSON/shapefiles into PMTiles. It only runs on Linux/macOS — **not natively on Windows**. Use WSL2.
 
 ### 1. Install WSL2 (if not already)
@@ -252,16 +212,17 @@ The scripts must be run **inside WSL** (not from Windows PowerShell/CMD) when PM
 # is available in WSL at:
 cd /mnt/e/Dev/monorepo\ projects/biznest_v2/apps/backend
 
+# Note we create another virtual environment here in WSL — the one created in Windows is separate and won't have tippecanoe available
 # Activate your Python venv (create one in WSL if needed)
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .lvenv # We name is as lvenv to distinguish from the Windows one, but you can name it anything
+source .lvenv/bin/activate
 pip install -r requirements.txt
 
 # Run scripts from WSL
 python scripts/seed_local_boundaries.py
 ```
 
-> **Windows-only fallback**: Add `--skip-pmtiles` to any seeder to write geometry to the database without generating PMTiles. PMTile generation can be deferred and run later from WSL.
+> **Note**: Inspect the seed in the script folder each seed I specified the descrition of the script and the expected output. You can run the scripts in any order but I recommend running them in the order specified the command on how to run each seeder script is also specified in the description of each script.
 
 ---
 

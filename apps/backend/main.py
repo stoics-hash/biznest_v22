@@ -1,4 +1,4 @@
-from dotenv import load_dotenv
+    from dotenv import load_dotenv
 load_dotenv()
 
 from contextlib import asynccontextmanager
@@ -30,6 +30,7 @@ from routes.user_roles import router as user_roles_router
 from routes.saved_locations import router as saved_locations_router
 from routes.audit_logs import router as audit_logs_router
 from routes.analyze import router as analyze_router
+from routes.regions import router as regions_router
 
 
 @asynccontextmanager
@@ -78,6 +79,8 @@ app.include_router(user_roles_router, prefix="/user-roles", tags=["user-roles"])
 app.include_router(saved_locations_router, prefix="/saved-locations", tags=["saved-locations"])
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 app.include_router(analyze_router, tags=["analyze"])
+app.include_router(regions_router, tags=["regions"])
+
 @app.get("/")
 def root():
     return {"message": "BizNest API running"}

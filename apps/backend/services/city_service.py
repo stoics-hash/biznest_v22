@@ -78,6 +78,18 @@ def get_all(db: Session, rc: redis_lib.Redis | None = None) -> list[City]:
     return cities
 
 
+def search(q: str, db: Session, limit: int = 50) -> list[City]:
+    pattern = f"%{q}%"
+    return (
+        db.query(City)
+        .options(defer(City.boundary))
+        .filter(City.name.ilike(pattern) | City.province.ilike(pattern))
+        .order_by(City.name)
+        .limit(limit)
+        .all()
+    )
+
+
 def get_or_404(city_id: UUID, db: Session, rc: redis_lib.Redis | None = None) -> City:
     key = _KEY_ONE.format(city_id)
 
