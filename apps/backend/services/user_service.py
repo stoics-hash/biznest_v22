@@ -1,12 +1,11 @@
 import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 import redis as redis_lib
 from fastapi import HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, REFRESH_TOKEN_EXPIRE_SECONDS, SECRET_KEY
+from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, REFRESH_TOKEN_EXPIRE_SECONDS
 from schema.UserDto import AuthResponse, LoginRequest, RegisterRequest, UserResponse
 from models.investor_subscription import InvestorSubscription
 from models.refresh_token import RefreshToken
@@ -24,7 +23,6 @@ from core.security import (
     user_to_cache_dict,
 )
 from core.security import hash_password, hash_token, verify_password
-from utils.jwtUtils import create_jwt
 
 
 def _warm_user_cache(user: User, rc: redis_lib.Redis | None) -> None:
@@ -155,17 +153,13 @@ def get_all_users(db: Session) -> list[UserResponse]:
 
 def create_auth_session(user: User, response: Response, db: Session) -> tuple[str, str]:
     """Mint access + refresh tokens, persist refresh hash, set both cookies."""
-    now = int(time.time())
-    access_token = create_jwt(
-        {
-            "sub": str(user.id),
-            "email": user.email,
-            "iat": now,
-            "exp": now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
-        },
-        key=SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+    from utils.jwtUtils import mint_access_token
+
+    user_role = db.query(UserRole).filter(UserRole.user_id == user.id).first()
+    role_name = user_role.role.name if user_role else None
+    role_id   = str(user_role.role_id) if user_role else None
+
+    access_token = mint_access_token(user, role_name=role_name, role_id=role_id)
 
     raw_refresh = secrets.token_urlsafe(32)
     db.add(RefreshToken(

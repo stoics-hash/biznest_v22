@@ -1,7 +1,7 @@
 import { useReducer, useEffect, useRef, type PropsWithChildren } from 'react'
+import { flushSync } from 'react-dom'
 import axios from 'axios'
 import { tokenManager } from '@/lib/axios'
-import { getUserRolesUserRolesUserIdGet } from '@networking/api/generated/user-roles/user-roles'
 import { myAccessCityAccessMeGet } from '@networking/api/generated/city-access/city-access'
 import {
   listAssignmentsLguAssignmentsGet,
@@ -73,21 +73,46 @@ function authReducer(_state: AuthState, action: AuthAction): AuthState {
   }
 }
 
-function getTokenExpiry(token: string): number | null {
+interface TokenClaims {
+  exp?: number
+  role?: string
+  role_id?: string
+  city_id?: string
+}
+
+function decodeTokenClaims(token: string): TokenClaims {
   try {
-    // Base64url → base64 → JSON
     const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const payload = JSON.parse(atob(b64)) as { exp?: number }
-    return typeof payload.exp === 'number' ? payload.exp : null
+    return JSON.parse(atob(b64)) as TokenClaims
   } catch {
-    return null
+    return {}
+  }
+}
+
+function getTokenExpiry(token: string): number | null {
+  const claims = decodeTokenClaims(token)
+  return typeof claims.exp === 'number' ? claims.exp : null
+}
+
+/** investor → /city-setup; admin/lgu_admin/superuser → /dashboard */
+function postAuthRoute(role_name: string | null, is_superuser: boolean): string {
+  if (is_superuser || role_name === 'admin' || role_name === 'lgu_admin') return '/dashboard'
+  return '/city-setup'
+}
+
+/** Reads role from the current access token — no extra API call needed. */
+function resolveRoleFromToken(): { role_name: string | null; role_id: string | null } {
+  const token = tokenManager.get()
+  if (!token) return { role_name: null, role_id: null }
+  const claims = decodeTokenClaims(token)
+  return {
+    role_name: typeof claims.role === 'string' ? claims.role : null,
+    role_id:   typeof claims.role_id === 'string' ? claims.role_id : null,
   }
 }
 
 async function resolveAuth(user: UserResponse) {
-  const rolesRes = await getUserRolesUserRolesUserIdGet(user.id)
-  const userRole = rolesRes.data[0] ?? null
-  const role_name = userRole?.role.name ?? null
+  const { role_name } = resolveRoleFromToken()
   const permissions = role_name ? (ROLE_PERMISSIONS[role_name] ?? []) : []
 
   let city_ids: string[] = []
@@ -261,8 +286,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const userRes = await axios.get<UserResponse>('/auth/me')
     const result = await resolveAuth(userRes.data)
     sessionStorage.removeItem(CITY_ID_KEY)
-    dispatch({ type: 'AUTH_SUCCESS', ...result })
-    await router.navigate({ to: '/city-setup' })
+    const target = postAuthRoute(result.role_name, userRes.data.is_superuser)
+    // flushSync: apply AUTH_SUCCESS synchronously so RouterProvider passes the updated
+    // auth context to beforeLoad before navigation starts — without this the guard sees
+    // stale UNAUTHENTICATED state and redirects to /login.
+    flushSync(() => dispatch({ type: 'AUTH_SUCCESS', ...result }))
+    await router.navigate({ to: target as never })
   }
 
   async function register(
@@ -277,8 +306,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const userRes = await axios.get<UserResponse>('/auth/me')
     const result = await resolveAuth(userRes.data)
     sessionStorage.removeItem(CITY_ID_KEY)
-    dispatch({ type: 'AUTH_SUCCESS', ...result })
-    await router.navigate({ to: '/city-setup' })
+    const target = postAuthRoute(result.role_name, userRes.data.is_superuser)
+    flushSync(() => dispatch({ type: 'AUTH_SUCCESS', ...result }))
+    await router.navigate({ to: target as never })
   }
 
   async function signOut() {

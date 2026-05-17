@@ -47,6 +47,7 @@ def revoke(access_id: UUID, db: Session) -> None:
 def select_city(user: User, city_id: UUID, db: Session) -> str:
     """Verify investor has access to city_id, then mint a new access token with city_id claim."""
     from utils.jwtUtils import mint_access_token
+    from models.user_role import UserRole
 
     access = db.query(InvestorCityAccess).filter(
         InvestorCityAccess.user_id == user.id,
@@ -55,7 +56,16 @@ def select_city(user: User, city_id: UUID, db: Session) -> str:
     if not access:
         raise HTTPException(status_code=403, detail="No access to this city")
 
-    return mint_access_token(user, extra_claims={"city_id": str(city_id)})
+    user_role = db.query(UserRole).filter(UserRole.user_id == user.id).first()
+    role_name = user_role.role.name if user_role else None
+    role_id   = str(user_role.role_id) if user_role else None
+
+    return mint_access_token(
+        user,
+        role_name=role_name,
+        role_id=role_id,
+        extra_claims={"city_id": str(city_id)},
+    )
 
 
 def get_city_geometry(
