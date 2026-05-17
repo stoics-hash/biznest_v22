@@ -29,6 +29,7 @@ from routes.roles import router as roles_router
 from routes.user_roles import router as user_roles_router
 from routes.saved_locations import router as saved_locations_router
 from routes.audit_logs import router as audit_logs_router
+from routes.analyze import router as analyze_router
 
 
 @asynccontextmanager
@@ -76,6 +77,7 @@ app.include_router(roles_router, prefix="/roles", tags=["roles"])
 app.include_router(user_roles_router, prefix="/user-roles", tags=["user-roles"])
 app.include_router(saved_locations_router, prefix="/saved-locations", tags=["saved-locations"])
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
+app.include_router(analyze_router, tags=["analyze"])
 @app.get("/")
 def root():
     return {"message": "BizNest API running"}
