@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, type ChangeEvent } from 'react'
 import { Copy, Check, Link2, Mail, Building2 } from 'lucide-react'
 import {
   Dialog,
@@ -18,7 +18,6 @@ import {
   ComboboxContent,
   ComboboxList,
   ComboboxItem,
-  ComboboxEmpty,
 } from '@/components/ui/combobox'
 import { useLguInvite } from '../composables/use-lgu-invite'
 
@@ -48,10 +47,14 @@ export function LguInviteDialog({ open, onOpenChange }: LguInviteDialogProps) {
   const {
     email, setEmail,
     cityId, setCityId,
+    citySearch, setCitySearch,
     cities, citiesLoading,
     sending, error, success, result,
     handleSubmit, reset,
   } = useLguInvite()
+
+  // Prevents the onChange that base-ui fires after selection from re-triggering search
+  const justSelectedRef = useRef(false)
 
   function handleOpenChange(val: boolean) {
     if (!val) reset()
@@ -117,36 +120,52 @@ export function LguInviteDialog({ open, onOpenChange }: LguInviteDialogProps) {
 
             <div className="space-y-1.5">
               <Label>City</Label>
-              {citiesLoading ? (
-                <div className="flex h-9 items-center gap-2 text-sm text-muted-foreground">
-                  <Spinner className="size-4" /> Loading cities…
-                </div>
-              ) : (
-                <Combobox
-                  value={cityId}
-                  onValueChange={val => setCityId(val as string | null)}
-                >
-                  <ComboboxInput
-                    placeholder="Search city…"
-                    showClear={!!cityId}
-                    className="w-full"
-                  />
-                  <ComboboxContent>
-                    <ComboboxList>
-                      <ComboboxEmpty>No cities found.</ComboboxEmpty>
-                      {cities.map(city => (
-                        <ComboboxItem key={city.id} value={city.id} label={city.name}>
+              <Combobox
+                value={cityId}
+                onValueChange={val => {
+                  justSelectedRef.current = true
+                  setCityId(val as string | null)
+                  setCitySearch('')
+                  // Clear flag after base-ui fires its post-selection onChange
+                  setTimeout(() => { justSelectedRef.current = false }, 50)
+                }}
+              >
+                <ComboboxInput
+                  placeholder="Type at least 2 characters…"
+                  showClear={!!cityId}
+                  className="w-full"
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    if (!justSelectedRef.current) setCitySearch(e.target.value)
+                  }}
+                />
+                <ComboboxContent>
+                  <ComboboxList>
+                    {citySearch.length < 2 ? (
+                      <p className="py-4 text-center text-xs text-muted-foreground">
+                        Type to search cities
+                      </p>
+                    ) : citiesLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                        <Spinner className="size-3.5" /> Searching…
+                      </div>
+                    ) : cities.length === 0 ? (
+                      <p className="py-4 text-center text-xs text-muted-foreground">
+                        No cities found.
+                      </p>
+                    ) : (
+                      cities.map(city => (
+                        <ComboboxItem key={city.id} value={city.name} label={city.name}>
                           <Building2 className="size-4 text-muted-foreground" />
                           <span>{city.name}</span>
                           {city.province && (
                             <span className="ml-auto text-xs text-muted-foreground">{city.province}</span>
                           )}
                         </ComboboxItem>
-                      ))}
-                    </ComboboxList>
-                  </ComboboxContent>
-                </Combobox>
-              )}
+                      ))
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
             </div>
 
             <Button

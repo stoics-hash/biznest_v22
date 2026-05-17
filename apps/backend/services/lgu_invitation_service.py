@@ -20,9 +20,20 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3001")
 LGU_INVITE_EXPIRE_HOURS = int(os.environ.get("LGU_INVITE_EXPIRE_HOURS", "24"))
 
 
+def _require_admin(user: User, db: Session) -> None:
+    from models.role import Role
+    has_admin = (
+        db.query(UserRole)
+        .join(Role, Role.id == UserRole.role_id)
+        .filter(UserRole.user_id == user.id, Role.name == "admin")
+        .first()
+    ) is not None
+    if not has_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
 def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) -> LguInviteResponse:
-    if not created_by.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Superuser access required")
+    _require_admin(created_by, db)
 
     if not db.query(City).filter(City.id == payload.city_id).first():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="City not found")

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import type { AxiosError } from 'axios'
@@ -14,11 +14,22 @@ function getErrorMessage(err: unknown): string {
 export function useLguInvite() {
   const [email, setEmail] = useState('')
   const [cityId, setCityId] = useState<string | null>(null)
+  const [citySearch, setCitySearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [result, setResult] = useState<LguInviteResponse | null>(null)
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(citySearch), 300)
+    return () => clearTimeout(t)
+  }, [citySearch])
+
   const { data: cities = [], isLoading: citiesLoading } = useQuery({
-    queryKey: ['/cities/'],
-    queryFn: () => listCitiesCitiesGet().then(r => r.data),
+    queryKey: ['/cities/', debouncedSearch],
+    queryFn: () => listCitiesCitiesGet(
+      undefined,
+      debouncedSearch ? { params: { q: debouncedSearch } } : undefined
+    ).then(r => r.data),
+    enabled: debouncedSearch.length >= 2,
   })
 
   const { mutateAsync: sendInvite, isPending: sending, error: mutationError, reset: resetMutation } = useMutation({
@@ -38,6 +49,8 @@ export function useLguInvite() {
   function reset() {
     setEmail('')
     setCityId(null)
+    setCitySearch('')
+    setDebouncedSearch('')
     setResult(null)
     resetMutation()
   }
@@ -45,6 +58,7 @@ export function useLguInvite() {
   return {
     email, setEmail,
     cityId, setCityId,
+    citySearch, setCitySearch,
     cities, citiesLoading,
     sending,
     error,

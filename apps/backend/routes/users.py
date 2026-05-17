@@ -20,7 +20,7 @@ def all_users(db: Session = Depends(get_db)):
     "/lgu/invite",
     response_model=LguInviteResponse,
     status_code=201,
-    summary="Send LGU admin registration invite (superuser only)",
+    summary="Send LGU admin registration invite (admin only)",
 )
 def invite_lgu_admin(
     payload: LguInviteRequest,

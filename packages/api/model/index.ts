@@ -47,6 +47,7 @@ export * from './lguInviteRequest';
 export * from './lguInviteResponse';
 export * from './lguRegisterRequest';
 export * from './listAuditLogsAuditLogsGetParams';
+export * from './listCitiesCitiesGetParams';
 export * from './listHazardPmtilesCitiesCityIdHazardsPmtilesGetParams';
 export * from './loginRequest';
 export * from './logoutRequest';

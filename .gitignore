@@ -14,6 +14,11 @@ dist/
 build/
 *.egg
 
+# Package managers
+# Generated API client
+packages/api/generated/
+packages/api/model/
+
 # Node.js
 node_modules/
 npm-debug.log*

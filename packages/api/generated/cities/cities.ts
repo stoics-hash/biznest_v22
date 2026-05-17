@@ -31,7 +31,8 @@ import type {
   CityResponse,
   CityStatsResponse,
   CityUpdate,
-  HTTPValidationError
+  HTTPValidationError,
+  ListCitiesCitiesGetParams
 } from '../../model';
 
 
@@ -46,35 +47,37 @@ type AwaitedInput<T> = PromiseLike<T> | T;
  * @summary List Cities
  */
 export const listCitiesCitiesGet = (
-     options?: AxiosRequestConfig
+    params?: ListCitiesCitiesGetParams, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<CityResponse[]>> => {
 
 
     return axios.default.get(
-      `/cities/`,options
+      `/cities/`,{
+    ...options,
+        params: {...params, ...options?.params},}
     );
   }
 
 
 
 
-export const getListCitiesCitiesGetQueryKey = () => {
+export const getListCitiesCitiesGetQueryKey = (params?: ListCitiesCitiesGetParams,) => {
     return [
-    `/cities/`
+    `/cities/`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListCitiesCitiesGetQueryOptions = <TData = Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError = AxiosError<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export const getListCitiesCitiesGetQueryOptions = <TData = Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError = AxiosError<HTTPValidationError>>(params?: ListCitiesCitiesGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError, TData>, axios?: AxiosRequestConfig}
 ) => {
 
 const {query: queryOptions, axios: axiosOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListCitiesCitiesGetQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListCitiesCitiesGetQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCitiesCitiesGet>>> = ({ signal }) => listCitiesCitiesGet({ signal, ...axiosOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCitiesCitiesGet>>> = ({ signal }) => listCitiesCitiesGet(params, { signal, ...axiosOptions });
 
 
 
@@ -84,19 +87,19 @@ const {query: queryOptions, axios: axiosOptions} = options ?? {};
 }
 
 export type ListCitiesCitiesGetQueryResult = NonNullable<Awaited<ReturnType<typeof listCitiesCitiesGet>>>
-export type ListCitiesCitiesGetQueryError = AxiosError<unknown>
+export type ListCitiesCitiesGetQueryError = AxiosError<HTTPValidationError>
 
 
 /**
  * @summary List Cities
  */
 
-export function useListCitiesCitiesGet<TData = Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError = AxiosError<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError, TData>, axios?: AxiosRequestConfig}
+export function useListCitiesCitiesGet<TData = Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError = AxiosError<HTTPValidationError>>(
+ params?: ListCitiesCitiesGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCitiesCitiesGet>>, TError, TData>, axios?: AxiosRequestConfig}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListCitiesCitiesGetQueryOptions(options)
+  const queryOptions = getListCitiesCitiesGetQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
