@@ -4,6 +4,7 @@
  * BizNest Geo-Intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { RegisterRequestRoleName } from './registerRequestRoleName';
 
 export interface RegisterRequest {
   /** @maxLength 254 */
@@ -18,4 +19,5 @@ export interface RegisterRequest {
      * @maxLength 128
      */
   password: string;
+  role_name?: RegisterRequestRoleName;
 }

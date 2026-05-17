@@ -8,6 +8,8 @@
 export * from './alertCreate';
 export * from './alertResponse';
 export * from './alertUpdate';
+export * from './analyzeRequest';
+export * from './analyzeResponse';
 export * from './auditLogResponse';
 export * from './auditLogResponseMeta';
 export * from './authResponse';
@@ -53,6 +55,7 @@ export * from './permissionResponse';
 export * from './presignedUrlResponse';
 export * from './refreshRequest';
 export * from './registerRequest';
+export * from './registerRequestRoleName';
 export * from './roleCreate';
 export * from './rolePermissionCreate';
 export * from './roleResponse';
