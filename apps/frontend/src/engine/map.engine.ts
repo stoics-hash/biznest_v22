@@ -1,5 +1,5 @@
 import maplibregl from 'maplibre-gl'
-import { bbox as turfBbox, booleanPointInPolygon, centroid as turfCentroid, point as turfPoint } from '@turf/turf'
+import { bbox as turfBbox, bboxPolygon, booleanPointInPolygon, centroid as turfCentroid, difference, featureCollection, point as turfPoint } from '@turf/turf'
 import type { LightPreset } from '@/context/map.context'
 
 type GeoJsonData = Parameters<maplibregl.GeoJSONSource['setData']>[0]
@@ -44,8 +44,10 @@ const LIGHT_PRESETS: Record<LightPreset, maplibregl.LightSpecification> = {
   night: { anchor: 'viewport', color: '#001a33', intensity: 0.6  },
 }
 
-const CITY_BOUND_SOURCE = 'city-boundary'
-const CITY_BOUND_LAYER  = 'city-boundary-outline'
+const CITY_BOUND_SOURCE   = 'city-boundary'
+const CITY_BOUND_LAYER    = 'city-boundary-outline'
+const CITY_OVERLAY_SOURCE = 'city-overlay'
+const CITY_OVERLAY_LAYER  = 'city-overlay-fill'
 
 const ZONING_SOURCE = 'zoning-src'
 const ZONING_FILL   = 'zoning-fill'
@@ -70,6 +72,7 @@ export class MapEngine {
   private readonly _markers = new Map<string, maplibregl.Marker>()
   private readonly _popups = new Map<string, maplibregl.Popup>()
   private _cityBoundary: BoundaryGeometry | null = null
+  private _boundaryMouseHandler: ((e: maplibregl.MapMouseEvent) => void) | null = null
   private readonly _hazardKeys = new Set<string>()
   private readonly _imageOverlayIds = new Set<string>()
   private _zoneClickListeners: {
@@ -332,7 +335,8 @@ export class MapEngine {
   }
 
   /**
-   * Renders a dark overlay outside the city boundary and a blue outline on the boundary edge.
+   * Renders a dark overlay outside the city boundary, a blue outline on the boundary edge,
+   * and changes the cursor to `not-allowed` when the pointer leaves the boundary.
    * Also restricts `isInsideBoundary` checks to this geometry.
    */
   setCityBoundary(boundary: BoundaryGeometry): this {
@@ -344,12 +348,25 @@ export class MapEngine {
     this.clearCityBoundary()
     this._cityBoundary = boundary
 
+    // Dark overlay covering the area outside the city boundary (non-critical — boundary renders regardless)
+    try {
+      const outside = this._outsideOverlayGeometry(boundary)
+      if (outside) {
+        this._map.addSource(CITY_OVERLAY_SOURCE, { type: 'geojson', data: outside })
+        this._map.addLayer({
+          id: CITY_OVERLAY_LAYER,
+          type: 'fill',
+          source: CITY_OVERLAY_SOURCE,
+          paint: { 'fill-color': '#000000', 'fill-opacity': 0.35 },
+        })
+      }
+    } catch { /* overlay is visual-only; never block the boundary outline */ }
+
+    // Boundary outline on top of the overlay
     this._map.addSource(CITY_BOUND_SOURCE, {
       type: 'geojson',
       data: { type: 'Feature', geometry: boundary as never, properties: {} },
     })
-
-    // Blue dashed boundary outline only — no grayscale fill overlay
     this._map.addLayer({
       id: CITY_BOUND_LAYER,
       type: 'line',
@@ -362,20 +379,34 @@ export class MapEngine {
       },
     })
 
+    // Cursor: not-allowed when pointer is outside the city boundary
+    this._boundaryMouseHandler = (e: maplibregl.MapMouseEvent) => {
+      const inside = this.isInsideBoundary(e.lngLat.lng, e.lngLat.lat)
+      this._map.getCanvas().style.cursor = inside ? '' : 'not-allowed'
+    }
+    this._map.on('mousemove', this._boundaryMouseHandler)
+
     this._restrictViewToBoundary(boundary)
 
     return this
   }
 
   /**
-   * Removes the city boundary overlay and restriction.
+   * Removes the city boundary overlay, outline, cursor restriction, and pan restriction.
    */
   clearCityBoundary(): this {
+    this.removeLayer(CITY_OVERLAY_LAYER)
+    this.removeSource(CITY_OVERLAY_SOURCE)
     this.removeLayer(CITY_BOUND_LAYER)
     this.removeSource(CITY_BOUND_SOURCE)
     this._cityBoundary = null
     this._map.setMaxBounds(null)
     this._map.setMinZoom(0)
+    if (this._boundaryMouseHandler) {
+      this._map.off('mousemove', this._boundaryMouseHandler)
+      this._boundaryMouseHandler = null
+      this._map.getCanvas().style.cursor = ''
+    }
     return this
   }
 
@@ -659,5 +690,19 @@ export class MapEngine {
   /** Compute [west, south, east, north] bounding box of a boundary geometry. */
   private _bbox(boundary: BoundaryGeometry): [number, number, number, number] {
     return turfBbox(boundary as Parameters<typeof turfBbox>[0]) as [number, number, number, number]
+  }
+
+  /**
+   * Returns a GeoJSON feature covering the world minus the city boundary.
+   * turf v7 difference() takes a FeatureCollection of exactly 2 features.
+   */
+  private _outsideOverlayGeometry(boundary: BoundaryGeometry) {
+    try {
+      const world = bboxPolygon([-180, -85.051129, 180, 85.051129])
+      const city  = { type: 'Feature' as const, geometry: boundary as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: {} }
+      return difference(featureCollection([world, city]))
+    } catch {
+      return null
+    }
   }
 }
