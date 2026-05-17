@@ -1,4 +1,4 @@
-import { AlertTriangle, LayoutGrid, X, Plus, Upload, PenLine, Plug, ScanText, Eye, EyeOff } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, X, Plus, Upload, PenLine, Plug, ScanText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { HazardPanel, HAZARD_META, type HazardGroup } from './hazard-panel'
+import { HazardPanel } from './hazard-panel'
 import { ZoningPanel } from './zoning-panel'
 
 type ActivePanel = 'hazard' | 'zoning' | null
@@ -28,57 +28,13 @@ const STRIP_BUTTONS: { id: NonNullable<ActivePanel>; icon: LucideIcon; label: st
 ]
 
 export function HazardControls() {
-  const {
-    hazardLayers, visibleHazardKeys, toggleHazard, engine, zoningPmtileUrl,
-    showZoning, setShowZoning,
-    showAllHazards, setShowAllHazards,
-    visibleZoningTypes, resetZoningTypes, resetHazardVisibility,
-  } = useMapContext()
+  const { hazardLayers, zoningPmtileUrl } = useMapContext()
   const { selectedCity } = useCityContext()
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
   const navigate = useNavigate()
 
-  const groups: HazardGroup[] = Object.entries(HAZARD_META)
-    .filter(([type]) => hazardLayers.some(t => t.hazard_type === type))
-    .map(([type, meta]) => ({
-      type,
-      meta,
-      tiles: hazardLayers.filter(t => t.hazard_type === type),
-    }))
-
-  const hasHazards = groups.length > 0
+  const hasHazards = hazardLayers.length > 0
   const hasZoning  = !!zoningPmtileUrl || !!selectedCity?.id
-
-  const hazardAllVisible = showAllHazards && visibleHazardKeys.size > 0
-  const zoningAllVisible = showZoning && (visibleZoningTypes === null || visibleZoningTypes.size > 0)
-  const panelVisible = activePanel === 'hazard' ? hazardAllVisible : zoningAllVisible
-
-  function handleHeaderVisibilityToggle() {
-    if (activePanel === 'hazard') {
-      if (hazardAllVisible) {
-        setShowAllHazards(false)
-      } else {
-        setShowAllHazards(true)
-        if (visibleHazardKeys.size === 0) resetHazardVisibility()
-      }
-    } else {
-      if (zoningAllVisible) {
-        setShowZoning(false)
-      } else {
-        setShowZoning(true)
-        if (visibleZoningTypes !== null && visibleZoningTypes.size === 0) resetZoningTypes()
-      }
-    }
-  }
-
-  function handleToggleAll(tiles: HazardGroup['tiles'], showAll: boolean) {
-    for (const tile of tiles) {
-      const key = engine?.hazardKey(tile) ?? `${tile.hazard_type}::${tile.scenario ?? 'all'}`
-      const visible = visibleHazardKeys.has(key)
-      if (showAll && !visible) toggleHazard(key)
-      else if (!showAll && visible) toggleHazard(key)
-    }
-  }
 
   function togglePanel(panel: ActivePanel) {
     setActivePanel(prev => (prev === panel ? null : panel))
@@ -100,14 +56,6 @@ export function HazardControls() {
                 {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
               </CardTitle>
               <div className="flex items-center gap-0.5 -mr-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 text-muted-foreground hover:text-foreground"
-                  onClick={handleHeaderVisibilityToggle}
-                >
-                  {panelVisible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
-                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
@@ -166,14 +114,7 @@ export function HazardControls() {
 
           <CardContent className="flex flex-col flex-1 min-h-0 p-0">
             {activePanel === 'hazard' ? (
-              <HazardPanel
-                groups={groups}
-                visibleHazardKeys={visibleHazardKeys}
-                showAllHazards={showAllHazards}
-                toggleHazard={toggleHazard}
-                onToggleAll={handleToggleAll}
-                onMasterOn={() => setShowAllHazards(true)}
-              />
+              <HazardPanel />
             ) : (
               <ZoningPanel />
             )}
