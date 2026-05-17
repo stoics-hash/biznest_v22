@@ -1,4 +1,5 @@
 import maplibregl from 'maplibre-gl'
+import { bbox as turfBbox, booleanPointInPolygon, centroid as turfCentroid, point as turfPoint } from '@turf/turf'
 import type { LightPreset } from '@/context/map.context'
 
 type GeoJsonData = Parameters<maplibregl.GeoJSONSource['setData']>[0]
@@ -464,13 +465,17 @@ export class MapEngine {
   /**
    * Returns true if [lng, lat] falls inside the current city boundary.
    * Returns true when no boundary is set (no restriction).
+   * Uses turf booleanPointInPolygon — handles holes and MultiPolygon correctly.
    */
   isInsideBoundary(lng: number, lat: number): boolean {
     if (!this._cityBoundary) return true
-    if (this._cityBoundary.type === 'Polygon') {
-      return this._pointInRing(lng, lat, this._cityBoundary.coordinates[0])
-    }
-    return this._cityBoundary.coordinates.some(poly => this._pointInRing(lng, lat, poly[0]))
+    return booleanPointInPolygon(turfPoint([lng, lat]), this._cityBoundary as Parameters<typeof booleanPointInPolygon>[1])
+  }
+
+  /** Returns [lng, lat] centroid of a boundary geometry. */
+  getCentroid(boundary: BoundaryGeometry): [number, number] {
+    const c = turfCentroid(boundary as Parameters<typeof turfCentroid>[0])
+    return c.geometry.coordinates as [number, number]
   }
 
   // ── Zoning PMTile layer ───────────────────────────────────────────────────────
@@ -649,33 +654,6 @@ export class MapEngine {
 
   /** Compute [west, south, east, north] bounding box of a boundary geometry. */
   private _bbox(boundary: BoundaryGeometry): [number, number, number, number] {
-    let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity
-    const visit = (ring: number[][]) => {
-      for (const [lng, lat] of ring) {
-        if (lng < w) w = lng
-        if (lat < s) s = lat
-        if (lng > e) e = lng
-        if (lat > n) n = lat
-      }
-    }
-    if (boundary.type === 'Polygon') {
-      boundary.coordinates.forEach(visit)
-    } else {
-      boundary.coordinates.forEach(poly => poly.forEach(visit))
-    }
-    return [w, s, e, n]
-  }
-
-  /** Ray-casting point-in-polygon for a single ring. */
-  private _pointInRing(lng: number, lat: number, ring: number[][]): boolean {
-    let inside = false
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const [xi, yi] = ring[i]
-      const [xj, yj] = ring[j]
-      if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
-        inside = !inside
-      }
-    }
-    return inside
+    return turfBbox(boundary as Parameters<typeof turfBbox>[0]) as [number, number, number, number]
   }
 }

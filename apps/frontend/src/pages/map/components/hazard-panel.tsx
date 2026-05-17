@@ -1,73 +1,116 @@
-import { Waves, Mountain, CloudLightning, Zap, Layers } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
-import type { HazardTile } from '@/engine/map.engine'
+import { useState } from 'react'
+import { Plus, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import { useMapContext } from '@/context/map.context'
+import { useCityContext } from '@/context/city.context'
+import { useListHazardPmtilesCitiesCityIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
 
-export interface HazardMeta {
-  label: string
-  icon: LucideIcon
-  iconColor: string
+const HAZARD_COLORS: Record<string, string> = {
+  flood:       'data-checked:bg-blue-500',
+  landslide:   'data-checked:bg-orange-500',
+  storm_surge: 'data-checked:bg-purple-500',
+  debris_flow: 'data-checked:bg-amber-600',
+  faultline:   'data-checked:bg-red-500',
+}
+const FALLBACK_COLOR = 'data-checked:bg-slate-500'
+
+const SCENARIO_DESCRIPTIONS: Record<string, string> = {
+  '5yr':   'Frequent event — low severity flooding',
+  '25yr':  'Moderate event — significant flood risk',
+  '100yr': 'Rare event — high severity, major impact',
+  'ssa1':  'Storm surge up to 1 m — minimal coastal threat',
+  'ssa2':  'Storm surge 1–3 m — moderate coastal threat',
+  'ssa3':  'Storm surge 3–5 m — severe coastal flooding',
+  'ssa4':  'Storm surge above 5 m — extreme threat',
 }
 
-export interface HazardGroup {
-  type: string
-  meta: HazardMeta
-  tiles: HazardTile[]
+function formatHazardLabel(type: string): string {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export const HAZARD_META: Record<string, HazardMeta> = {
-  flood:       { label: 'Flood',       icon: Waves,          iconColor: 'text-blue-400'   },
-  landslide:   { label: 'Landslide',   icon: Mountain,       iconColor: 'text-orange-400' },
-  storm_surge: { label: 'Storm Surge', icon: CloudLightning, iconColor: 'text-purple-400' },
-  debris_flow: { label: 'Debris Flow', icon: Layers,         iconColor: 'text-amber-500'  },
-  faultline:   { label: 'Faultline',   icon: Zap,            iconColor: 'text-red-400'    },
-}
-
-const SCENARIO_LABELS: Record<string, string> = {
-  '5yr':   '5-Year Return',
-  '25yr':  '25-Year Return',
-  '100yr': '100-Year Return',
-  'ssa1':  'SSA Level 1',
-  'ssa2':  'SSA Level 2',
-  'ssa3':  'SSA Level 3',
-  'ssa4':  'SSA Level 4',
-}
-
-function scenarioLabel(scenario: string | null): string {
+function formatScenarioLabel(scenario: string | null): string {
   if (!scenario) return 'All Features'
-  return SCENARIO_LABELS[scenario] ?? scenario.toUpperCase()
+  const yr = scenario.match(/^(\d+)yr$/i)
+  if (yr) return `${yr[1]}-Year Return`
+  const ssa = scenario.match(/^ssa(\d+)$/i)
+  if (ssa) return `SSA Level ${ssa[1]}`
+  return scenario.toUpperCase()
 }
 
-export function HazardPanel({
-  groups,
-  visibleHazardKeys,
-  showAllHazards,
-  toggleHazard,
-  onToggleAll,
-  onMasterOn,
-}: {
-  groups: HazardGroup[]
-  visibleHazardKeys: Set<string>
-  showAllHazards: boolean
-  toggleHazard: (key: string) => void
-  onToggleAll: (tiles: HazardTile[], showAll: boolean) => void
-  onMasterOn: () => void
-}) {
+const SWITCH_BASE = 'shrink-0 data-unchecked:bg-muted-foreground/20'
+
+export function HazardPanel() {
+  const { visibleHazardKeys, toggleHazard } = useMapContext()
+  const { selectedCity } = useCityContext()
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const { data, isLoading } = useListHazardPmtilesCitiesCityIdHazardsPmtilesGet(
+    selectedCity?.id ?? '',
+  )
+
+  const tiles = data?.data ?? []
+
+  const typeOrder = [...new Set(tiles.map(t => t.hazard_type))]
+  const groups = typeOrder.map(type => ({
+    type,
+    tiles: tiles.filter(t => t.hazard_type === type),
+  }))
+
+  function toggleExpanded(type: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) next.delete(type)
+      else next.add(type)
+      return next
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center flex-1 text-xs text-muted-foreground py-8">
+        Loading…
+      </div>
+    )
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="flex items-center justify-center flex-1 text-xs text-muted-foreground py-8">
+        No hazard data for this city
+      </div>
+    )
+  }
+
   return (
     <ScrollArea className="flex-1 min-h-0">
       <div className="px-3 pb-3 space-y-1">
         {groups.map((group, gi) => {
-          const Icon = group.meta.icon
-          const keys = group.tiles.map(t => `${t.hazard_type}::${t.scenario ?? 'all'}`)
-          const allOn = showAllHazards && keys.every(k => visibleHazardKeys.has(k))
-          const someOn = showAllHazards && keys.some(k => visibleHazardKeys.has(k))
+          const hasScenarios = group.tiles.length > 1
+          const isExpanded = expanded.has(group.type)
+          const switchColor = HAZARD_COLORS[group.type] ?? FALLBACK_COLOR
 
-          function handleGroupToggle(checked: boolean) {
-            if (!showAllHazards) { onMasterOn(); return }
-            onToggleAll(group.tiles, checked)
+          if (!hasScenarios) {
+            const tile = group.tiles[0]
+            const key = `${tile.hazard_type}::${tile.scenario ?? 'all'}`
+            return (
+              <div key={group.type}>
+                {gi > 0 && <Separator className="mb-1" />}
+                <div className="flex items-center justify-between py-2 gap-2">
+                  <span className="text-xs font-semibold truncate flex-1">
+                    {formatHazardLabel(group.type)}
+                  </span>
+                  <Switch
+                    checked={visibleHazardKeys.has(key)}
+                    onCheckedChange={() => toggleHazard(key)}
+                    className={cn(SWITCH_BASE, 'scale-90', switchColor)}
+                  />
+                </div>
+              </div>
+            )
           }
 
           return (
@@ -75,37 +118,42 @@ export function HazardPanel({
               {gi > 0 && <Separator className="mb-1" />}
 
               <div className="flex items-center justify-between py-2 gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Icon className={cn('size-4 shrink-0', group.meta.iconColor)} />
-                  <span className={cn('text-xs font-semibold truncate', !showAllHazards && 'opacity-40')}>{group.meta.label}</span>
-                </div>
-                <Switch
-                  checked={allOn}
-                  data-state={someOn && !allOn ? 'indeterminate' : undefined}
-                  onCheckedChange={handleGroupToggle}
-                  className="shrink-0 scale-90 bg-amber-300"
-                />
+                <span className="text-xs font-semibold truncate flex-1">
+                  {formatHazardLabel(group.type)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                  onClick={() => toggleExpanded(group.type)}
+                >
+                  {isExpanded ? <Minus className="size-3" /> : <Plus className="size-3" />}
+                </Button>
               </div>
 
-              {group.tiles.length > 1 && (
-                <div className="ml-6 space-y-0">
+              {isExpanded && (
+                <div className="ml-3 mb-1 border-l border-border/50 pl-3 space-y-0">
                   {group.tiles.map((tile, ti) => {
                     const key = `${tile.hazard_type}::${tile.scenario ?? 'all'}`
-                    const visible = showAllHazards && visibleHazardKeys.has(key)
+                    const desc = tile.scenario ? SCENARIO_DESCRIPTIONS[tile.scenario] : undefined
                     return (
                       <div key={key}>
-                        {ti > 0 && <Separator className="my-0 opacity-40" />}
+                        {ti > 0 && <Separator className="my-0 opacity-30" />}
                         <div className="flex items-center justify-between py-2 gap-3">
-                          <span className={cn('text-[11px] text-muted-foreground leading-tight', !showAllHazards && 'opacity-40')}>
-                            {scenarioLabel(tile.scenario)}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-medium leading-tight">
+                              {formatScenarioLabel(tile.scenario)}
+                            </div>
+                            {desc && (
+                              <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                                {desc}
+                              </div>
+                            )}
+                          </div>
                           <Switch
-                            checked={visible}
-                            onCheckedChange={() => {
-                              if (!showAllHazards) { onMasterOn(); return }
-                              toggleHazard(key)
-                            }}
-                            className="shrink-0 scale-75"
+                            checked={visibleHazardKeys.has(key)}
+                            onCheckedChange={() => toggleHazard(key)}
+                            className={cn(SWITCH_BASE, 'scale-75', switchColor)}
                           />
                         </div>
                       </div>
