@@ -1,12 +1,11 @@
 import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 import redis as redis_lib
 from fastapi import HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, REFRESH_TOKEN_EXPIRE_SECONDS, SECRET_KEY
+from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, REFRESH_TOKEN_EXPIRE_SECONDS
 from schema.UserDto import AuthResponse, LoginRequest, RegisterRequest, UserResponse
 from models.investor_subscription import InvestorSubscription
 from models.refresh_token import RefreshToken
@@ -24,7 +23,6 @@ from core.security import (
     user_to_cache_dict,
 )
 from core.security import hash_password, hash_token, verify_password
-from utils.jwtUtils import create_jwt
 
 
 def _warm_user_cache(user: User, rc: redis_lib.Redis | None) -> None:
@@ -72,9 +70,9 @@ def register(payload: RegisterRequest, response: Response, db: Session, rc: redi
     db.commit()
     db.refresh(user)
 
-    access_token, raw_refresh = create_auth_session(user, response, db)
+    access_token, _ = create_auth_session(user, response, db)
     _warm_user_cache(user, rc)
-    return _auth_response(user, access_token, raw_refresh)
+    return _auth_response(user, access_token)
 
 
 def login(payload: LoginRequest, response: Response, db: Session, rc: redis_lib.Redis | None = None) -> AuthResponse:
@@ -85,9 +83,9 @@ def login(payload: LoginRequest, response: Response, db: Session, rc: redis_lib.
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User is inactive")
 
-    access_token, raw_refresh = create_auth_session(user, response, db)
+    access_token, _ = create_auth_session(user, response, db)
     _warm_user_cache(user, rc)   # prime cache so first /me after login is cache hit
-    return _auth_response(user, access_token, raw_refresh)
+    return _auth_response(user, access_token)
 
 
 def logout(response: Response, raw_refresh_token: str | None, db: Session, rc: redis_lib.Redis | None = None) -> None:
@@ -145,8 +143,8 @@ def refresh_tokens(raw_refresh_token: str, response: Response, db: Session) -> A
     rt.revoked_at = datetime.now(timezone.utc)
     db.flush()
 
-    access_token, raw_refresh = create_auth_session(user, response, db)
-    return _auth_response(user, access_token, raw_refresh)
+    access_token, _ = create_auth_session(user, response, db)
+    return _auth_response(user, access_token)
 
 
 def get_all_users(db: Session) -> list[UserResponse]:
@@ -155,17 +153,13 @@ def get_all_users(db: Session) -> list[UserResponse]:
 
 def create_auth_session(user: User, response: Response, db: Session) -> tuple[str, str]:
     """Mint access + refresh tokens, persist refresh hash, set both cookies."""
-    now = int(time.time())
-    access_token = create_jwt(
-        {
-            "sub": str(user.id),
-            "email": user.email,
-            "iat": now,
-            "exp": now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
-        },
-        key=SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+    from utils.jwtUtils import mint_access_token
+
+    user_role = db.query(UserRole).filter(UserRole.user_id == user.id).first()
+    role_name = user_role.role.name if user_role else None
+    role_id   = str(user_role.role_id) if user_role else None
+
+    access_token = mint_access_token(user, role_name=role_name, role_id=role_id)
 
     raw_refresh = secrets.token_urlsafe(32)
     db.add(RefreshToken(
@@ -179,13 +173,12 @@ def create_auth_session(user: User, response: Response, db: Session) -> tuple[st
     return access_token, raw_refresh
 
 
-def _auth_response(user: User, access_token: str, refresh_token: str) -> AuthResponse:
+def _auth_response(user: User, access_token: str) -> AuthResponse:
     return AuthResponse(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
         expires_in=int(ACCESS_TOKEN_EXPIRE_SECONDS),
     )

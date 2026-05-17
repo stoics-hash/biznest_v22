@@ -16,7 +16,6 @@ def all_users(db: Session = Depends(get_db)):
 
 
 # LGU admin magic-link invitation flow
-
 @router.post(
     "/lgu/invite",
     response_model=LguInviteResponse,

@@ -35,14 +35,24 @@ def create_jwt(payload: dict, key: str, algorithm: str = "HS256") -> str:
 # Token minting (access token with user claims)
 # ---------------------------------------------------------------------------
 
-def mint_access_token(user, extra_claims: dict | None = None) -> str:
+def mint_access_token(
+    user,
+    role_name: str | None = None,
+    role_id: str | None = None,
+    extra_claims: dict | None = None,
+) -> str:
     from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
     now = int(time.time())
-    payload = {
+    payload: dict = {
         "sub":   str(user.id),
         "email": user.email,
         "iat":   now,
         "exp":   now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
-        **(extra_claims or {}),
     }
+    if role_name:
+        payload["role"] = role_name
+    if role_id:
+        payload["role_id"] = role_id
+    if extra_claims:
+        payload.update(extra_claims)
     return create_jwt(payload, key=SECRET_KEY, algorithm=ALGORITHM)

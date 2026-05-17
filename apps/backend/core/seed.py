@@ -17,19 +17,22 @@ DEFAULT_PLANS = [
 ]
 
 DEFAULT_PERMISSIONS = [
-    ("manage:city",             "Can manage city data"),
-    ("zoning:read",           "View zoning areas"),
-    ("zoning:write",          "Create and edit zoning areas"),
-    ("hazard:read",           "View hazard areas"),
-    ("hazard:write",          "Create and edit hazard areas"),
-    ("establishment:read",    "View establishments"),
-    ("establishment:write",   "Create and edit establishments"),
-    ("alert:read",            "View alerts"),
-    ("alert:write",           "Create and manage alerts"),
-    ("analytics:view",        "View investment analytics"),
-    ("location:save",         "Save personal locations"),
-    ("manage:user",           "Manage  user and role"),
-    ("manage:role",            "Manage role and  permissions")
+    ("manage:city",          "Can manage city data"),
+    ("zoning:read",          "View zoning areas"),
+    ("zoning:write",         "Create and edit zoning areas"),
+    ("hazard:read",          "View hazard areas"),
+    ("hazard:write",         "Create and edit hazard areas"),
+    ("establishment:read",   "View establishments"),
+    ("establishment:write",  "Create and edit establishments"),
+    ("alert:read",           "View alerts"),
+    ("alert:write",          "Create and manage alerts"),
+    ("analytics:view",       "View investment analytics"),
+    ("location:save",        "Save personal locations"),
+    ("manage:user",          "Manage user and role"),
+    ("manage:role",          "Manage role and permissions"),
+    ("view:map",             "Access the interactive map"),
+    ("manage:subscription",  "View and manage subscription plan"),
+    ("manage:logs",          "View audit logs"),
 ]
 
 ROLES = {
@@ -40,6 +43,8 @@ ROLES = {
         "alert:read",
         "analytics:view",
         "location:save",
+        "view:map",
+        "manage:subscription",
     ],
     "lgu_admin": [
         "manage:city",
@@ -53,6 +58,8 @@ ROLES = {
         "alert:write",
         "analytics:view",
         "location:save",
+        "view:map",
+        "manage:logs",
     ],
     "admin": [
         "manage:city",
@@ -68,6 +75,9 @@ ROLES = {
         "location:save",
         "manage:user",
         "manage:role",
+        "view:map",
+        "manage:subscription",
+        "manage:logs",
     ],
 }
 

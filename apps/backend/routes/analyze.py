@@ -1,0 +1,25 @@
+import redis as redis_lib
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from core.db import get_db
+from core.redis import get_redis
+from core.security import get_authenticated_user
+from models.user import User
+from repository.analyze_repository import AnalyzeRepository
+from services.analyze_service import AnalyzeService
+from schema.AnalyzeDto import AnalyzeRequest, AnalyzeResponse
+
+router = APIRouter(tags=["analyze"])
+
+
+@router.post("/cities/{city_id}/analyze", response_model=AnalyzeResponse)
+def analyze_city(
+    city_id: str,
+    payload: AnalyzeRequest,
+    _: User = Depends(get_authenticated_user),
+    db: Session = Depends(get_db),
+    rc: redis_lib.Redis = Depends(get_redis),
+):
+    service = AnalyzeService(AnalyzeRepository(db), rc)
+    return service.analyze(city_id, payload)

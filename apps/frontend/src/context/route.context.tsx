@@ -1,10 +1,10 @@
 import { RouterProvider } from '@tanstack/react-router'
-import { useAuthContext } from '@/context/auth.context'
-import { router } from '@/router'
-import { queryClient } from '@/lib/query-client'
-import { Spinner } from '@/components/ui/spinner'
+import { useAuthContext } from '@/context/auth.context.ts'
+import { router } from '@/router.ts'
+import { queryClient } from '@/lib/query-client.ts'
+import { Spinner } from '@/components/ui/spinner.tsx'
 
-export function RouteWithContext() {
+export function RouteContext() {
   const auth = useAuthContext()
 
   if (auth.state.state === 'BOOT' || auth.state.state === 'RESTORING') {

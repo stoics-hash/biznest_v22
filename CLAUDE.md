@@ -52,17 +52,17 @@ Route files in `src/apps/` are thin wrappers — they just import and render fro
 
 ### Provider stack (order matters)
 
-Entry point: `src/providers/AppProvider.tsx`.
+Entry point: `src/providers/app.provider.tsx`.
 
 ```
 QueryClientProvider
   └─ AuthProvider          ← JWT auth, role/permission resolution
        └─ CityProvider     ← selected city state (persisted in localStorage)
             └─ MapProvider ← MapLibre GL instance + light preset + 3D terrain state
-                 └─ RouteWithContext  ← RouterProvider with auth context injected
+                 └─ RouteContext  ← RouterProvider with auth context injected
 ```
 
-`RouteWithContext` passes auth context into TanStack Router via `createRootRouteWithContext`.
+`RouteContext` passes auth context into TanStack Router via `createRootRouteWithContext`.
 
 ### Auth flow
 
@@ -71,7 +71,7 @@ QueryClientProvider
 On mount, it executes in sequence:
 1. `currentUserUsersMeGet()` — validates JWT cookie, gets user
 2. `getUserRolesUserRolesUserIdGet(userId)` — resolves role
-3. Permission set resolved via hard-coded `ROLE_PERMISSIONS` map in `AuthProvider.tsx` (mirrors backend seed)
+3. Permission set resolved via hard-coded `ROLE_PERMISSIONS` map in `auth.provider.tsx` (mirrors backend seed)
 4. City access loaded by role: `investor` calls `myAccessCityAccessMeGet()`, `lgu_admin` calls `listAssignmentsLguAssignmentsGet()`
 
 `signIn()` / `register()` set cookie + dispatch `AUTH_SUCCESS`, then navigate to `/city-setup`. `register()` accepts an optional `role` param (`'investor' | 'lgu_admin'`, defaults to `'investor'`). `signOut()` clears cookie + navigates to `/login`. `refreshCities()` re-resolves city access without signing out — call after granting/revoking city access.
@@ -91,7 +91,7 @@ import { PERMISSION } from '@/config/permissions'
 usePermission(PERMISSION.HAZARD_READ)
 ```
 
-The `ROLE_PERMISSIONS` map in `AuthProvider.tsx` controls frontend UI visibility only. The backend does **not** enforce permissions at the route level — do not rely on frontend permission checks for security.
+The `ROLE_PERMISSIONS` map in `auth.provider.tsx` controls frontend UI visibility only. The backend does **not** enforce permissions at the route level — do not rely on frontend permission checks for security.
 
 ### Geo contexts
 
