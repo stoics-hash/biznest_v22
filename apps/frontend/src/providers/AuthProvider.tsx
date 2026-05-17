@@ -1,8 +1,7 @@
 import { useReducer, useEffect, useRef, type PropsWithChildren } from 'react'
 import axios from 'axios'
 import { tokenManager } from '@/lib/axios'
-import { getUserRolesUserRolesUserIdGet, assignRoleUserRolesPost } from '@networking/api/generated/user-roles/user-roles'
-import { listRolesRolesGet } from '@networking/api/generated/roles/roles'
+import { getUserRolesUserRolesUserIdGet } from '@networking/api/generated/user-roles/user-roles'
 import { myAccessCityAccessMeGet } from '@networking/api/generated/city-access/city-access'
 import {
   listAssignmentsLguAssignmentsGet,
@@ -205,14 +204,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     password: string,
     role: 'investor' | 'lgu_admin' = 'investor',
   ) {
-    const registerRes = await axios.post<AuthApiResponse>('/auth/register', { email, full_name, password })
+    const registerRes = await axios.post<AuthApiResponse>('/auth/register', { email, full_name, password, role_name: role })
     tokenManager.set(registerRes.data.access_token)
     const userRes = await axios.get<UserResponse>('/auth/me')
-    const rolesRes = await listRolesRolesGet()
-    const targetRole = rolesRes.data.find(r => r.name === role)
-    if (targetRole) {
-      await assignRoleUserRolesPost({ user_id: userRes.data.id, role_id: targetRole.id })
-    }
     const result = await resolveAuth(userRes.data)
     sessionStorage.removeItem(CITY_ID_KEY)
     dispatch({ type: 'AUTH_SUCCESS', ...result })

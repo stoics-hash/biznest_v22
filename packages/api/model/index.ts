@@ -17,6 +17,7 @@ export * from './cityGeometryResponse';
 export * from './cityGeometryResponseBoundary';
 export * from './cityResponse';
 export * from './citySelectResponse';
+export * from './cityStatsResponse';
 export * from './cityUpdate';
 export * from './documentUploadResponse';
 export * from './establishmentCreate';

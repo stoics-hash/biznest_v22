@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from core.redis import get_redis
 from core.security import get_authenticated_user
-from schema.CityDto import CityCreate, CityGeometryResponse, CityResponse, CityUpdate
+from schema.CityDto import CityCreate, CityGeometryResponse, CityResponse, CityStatsResponse, CityUpdate
 from models.user import User
 from services import city_service
 from core.db import get_db
@@ -50,6 +50,16 @@ def get_city_geometry(
     """Return only boundary GeoJSON. Cached in Redis for 1 hour."""
     geometry = city_service.get_city_geometry(city_id, db, rc)
     return CityGeometryResponse(id=city_id, boundary=geometry)
+
+@router.get("/{city_id}/stats", response_model=CityStatsResponse)
+def get_city_stats(
+    city_id: UUID,
+    db: Session = Depends(get_db),
+    rc: redis_lib.Redis = Depends(get_redis),
+    _: User = Depends(get_authenticated_user),
+):
+    return city_service.get_city_stats(city_id, db, rc)
+
 
 @router.patch("/{city_id}", response_model=CityResponse)
 def update_city(

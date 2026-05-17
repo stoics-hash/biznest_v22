@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getMySubscriptionSubscriptionsMeGet } from '@networking/api/generated/subscriptions/subscriptions'
-import { listHazardAreasCitiesCityIdHazardsGet } from '@networking/api/generated/hazards/hazards'
-import { listZoningAreasCitiesCityIdZoningGet } from '@networking/api/generated/zoning/zoning'
 import { listEstablishmentsCitiesCityIdEstablishmentsGet } from '@networking/api/generated/establishments/establishments'
+import { useGetCityStats } from '@networking/api/cities-stats'
 import { useAuthContext } from '@/context/auth.context'
 import { useCityContext } from '@/context/city.context'
 
@@ -12,17 +11,8 @@ export function useDashboardData() {
   const auth = state.state === 'AUTHENTICATED' ? state : null
   const cityId = selectedCity?.id ?? null
 
-  const { data: hazards = [], isLoading: hazardsLoading } = useQuery({
-    queryKey: [`/cities/${cityId}/hazards`],
-    queryFn: () => listHazardAreasCitiesCityIdHazardsGet(cityId!).then(r => r.data),
-    enabled: !!cityId,
-  })
-
-  const { data: zoning = [], isLoading: zoningLoading } = useQuery({
-    queryKey: [`/cities/${cityId}/zoning`],
-    queryFn: () => listZoningAreasCitiesCityIdZoningGet(cityId!).then(r => r.data),
-    enabled: !!cityId,
-  })
+  const { data: statsData, isLoading: statsLoading } = useGetCityStats(cityId)
+  const stats = statsData?.data
 
   const { data: establishments = [], isLoading: establishmentsLoading } = useQuery({
     queryKey: [`/cities/${cityId}/establishments`],
@@ -37,17 +27,20 @@ export function useDashboardData() {
     retry: false,
   })
 
-  const dataLoading = hazardsLoading || zoningLoading || establishmentsLoading
+  const dataLoading = statsLoading || establishmentsLoading
 
   return {
     user: auth?.user ?? null,
     role_name: auth?.role_name ?? null,
     cityIds: auth?.city_ids ?? [],
     selectedCity,
-    hazards,
-    zoning,
+    hazardCount: stats?.hazard_count ?? 0,
+    zoningCount: stats?.zoning_count ?? 0,
+    establishmentCount: stats?.establishment_count ?? 0,
+    alertCount: stats?.alert_count ?? 0,
     establishments,
     subscription,
     dataLoading,
+    statsLoaded: !statsLoading && !!stats,
   }
 }

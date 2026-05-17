@@ -13,10 +13,17 @@ export function GuestLayout({ children }: PropsWithChildren) {
             className="flex items-center gap-2 text-sm font-semibold"
           >
             <BrandIcon className="size-4" />
-            Networking
+            BizNest
           </Link>
 
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to={'/blog' as never}>Blog</Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to={'/about' as never}>About</Link>
+            </Button>
+            <div className="mx-2 h-4 w-px bg-border" />
             <Button variant="ghost" size="sm" asChild>
               <Link to={'/login' as never}>Sign in</Link>
             </Button>

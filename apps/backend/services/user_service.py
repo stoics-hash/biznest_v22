@@ -60,13 +60,14 @@ def register(payload: RegisterRequest, response: Response, db: Session, rc: redi
     db.add(user)
     db.flush()
 
-    investor_role = db.query(Role).filter(Role.name == "investor").first()
-    if investor_role:
-        db.add(UserRole(user_id=user.id, role_id=investor_role.id))
+    role = db.query(Role).filter(Role.name == payload.role_name).first()
+    if role:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
 
-    free_plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.name == "free").first()
-    if free_plan:
-        db.add(InvestorSubscription(user_id=user.id, plan_id=free_plan.id))
+    if payload.role_name == 'investor':
+        free_plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.name == "free").first()
+        if free_plan:
+            db.add(InvestorSubscription(user_id=user.id, plan_id=free_plan.id))
 
     db.commit()
     db.refresh(user)
