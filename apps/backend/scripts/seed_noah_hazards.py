@@ -474,7 +474,6 @@ def _worker(task: dict) -> tuple[str, int]:
         print(f"    [{stem}] sjoin failed: {exc}", flush=True)
         return stem, 0
 
-    joined = joined[~joined.index.duplicated(keep="first")]
     joined = joined[joined["city_id_ref"].notna()]
 
     if joined.empty:
@@ -488,7 +487,24 @@ def _worker(task: dict) -> tuple[str, int]:
         if not city or not city.code:
             continue
 
-        features = gpd.GeoDataFrame(geometry=group["geometry"], crs="EPSG:4326")
+        boundary_series = cities_gdf.loc[cities_gdf["city_id_ref"] == city_id_str, "geometry"]
+        if boundary_series.empty:
+            continue
+        city_boundary = boundary_series.iloc[0]
+
+        clipped_geoms = []
+        for geom in group["geometry"]:
+            try:
+                clipped = geom.intersection(city_boundary)
+                if clipped is not None and not clipped.is_empty:
+                    clipped_geoms.append(clipped)
+            except Exception:
+                pass
+
+        if not clipped_geoms:
+            continue
+
+        features = gpd.GeoDataFrame(geometry=clipped_geoms, crs="EPSG:4326")
         if features.empty:
             continue
 
@@ -552,7 +568,6 @@ def _process_national(
     except Exception as exc:
         print(f"    sjoin failed: {exc}", flush=True)
         return
-    joined = joined[~joined.index.duplicated(keep="first")]
     joined = joined[joined["city_id_ref"].notna()]
     if joined.empty:
         print("    no features intersect any city", flush=True)
@@ -566,7 +581,24 @@ def _process_national(
         if not city or not city.code:
             continue
 
-        features = gpd.GeoDataFrame(geometry=group["geometry"], crs="EPSG:4326")
+        boundary_series = cities_gdf.loc[cities_gdf["city_id_ref"] == city_id_str, "geometry"]
+        if boundary_series.empty:
+            continue
+        city_boundary = boundary_series.iloc[0]
+
+        clipped_geoms = []
+        for geom in group["geometry"]:
+            try:
+                clipped = geom.intersection(city_boundary)
+                if clipped is not None and not clipped.is_empty:
+                    clipped_geoms.append(clipped)
+            except Exception:
+                pass
+
+        if not clipped_geoms:
+            continue
+
+        features = gpd.GeoDataFrame(geometry=clipped_geoms, crs="EPSG:4326")
         if features.empty:
             continue
 
