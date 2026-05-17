@@ -14,7 +14,7 @@ from models.role import Role
 from models.user import User
 from models.user_role import UserRole
 from utils.email_utils import send_lgu_invite_email
-from utils.jwtUtils import hash_password
+from core.security import hash_password
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3001")
 LGU_INVITE_EXPIRE_HOURS = int(os.environ.get("LGU_INVITE_EXPIRE_HOURS", "24"))

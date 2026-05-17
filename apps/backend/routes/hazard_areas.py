@@ -8,7 +8,7 @@ from schema.HazardAreaDto import HazardAreaCreate, HazardAreaResponse, HazardAre
 from models.user import User
 from services import hazard_area_service
 from services.auth_service import get_authenticated_user
-from utils.jwtUtils import get_db
+from core.db import get_db
 
 router = APIRouter()
 

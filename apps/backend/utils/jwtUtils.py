@@ -3,25 +3,6 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Optional
-
-
-def hash_token(raw: str) -> str:
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-from core.db import SessionLocal
-
-
-# ---------------------------------------------------------------------------
-# DB dependency
-# ---------------------------------------------------------------------------
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # ---------------------------------------------------------------------------
@@ -51,22 +32,17 @@ def create_jwt(payload: dict, key: str, algorithm: str = "HS256") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Password hashing (SHA256 + salt)
+# Token minting (access token with user claims)
 # ---------------------------------------------------------------------------
 
-def hash_password(password: str, salt: Optional[str] = None) -> str:
-    if salt is None:
-        salt = base64.urlsafe_b64encode(
-            hashlib.sha256(str(time.time_ns()).encode()).digest()
-        )[:16].decode()
-    digest = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
-    return f"{salt}${digest}"
-
-
-def verify_password(password: str, stored: str) -> bool:
-    try:
-        salt, digest = stored.split("$", 1)
-    except ValueError:
-        return False
-    calc = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
-    return hmac.compare_digest(calc, digest)
+def mint_access_token(user, extra_claims: dict | None = None) -> str:
+    from core.db import ACCESS_TOKEN_EXPIRE_SECONDS, ALGORITHM, SECRET_KEY
+    now = int(time.time())
+    payload = {
+        "sub":   str(user.id),
+        "email": user.email,
+        "iat":   now,
+        "exp":   now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
+        **(extra_claims or {}),
+    }
+    return create_jwt(payload, key=SECRET_KEY, algorithm=ALGORITHM)

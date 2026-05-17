@@ -8,7 +8,7 @@ import type { CityCreate } from '@networking/api/model/cityCreate'
 import { useAuthContext } from '@/context/auth.context'
 
 export function useCitySetup() {
-  const { state, selectCity } = useAuthContext()
+  const { state, selectCity, signOut } = useAuthContext()
   const auth = state.state === 'AUTHENTICATED' ? state : null
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -105,5 +105,6 @@ export function useCitySetup() {
     claimCity,
     createCity,
     enterCity,
+    signOut,
   }
 }

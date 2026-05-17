@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
@@ -18,6 +18,7 @@ class RegisterRequest(BaseModel):
             max_length=128,
         )
     ]
+    role_name: Literal['investor', 'lgu_admin'] = 'investor'
 
 
 class LoginRequest(BaseModel):

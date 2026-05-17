@@ -15,7 +15,7 @@ Usage:
   python scripts/seed_noah_hazards.py --hazards flood                   # flood only
   python scripts/seed_noah_hazards.py --hazards flood --scenarios 100yr # one scenario
   python scripts/seed_noah_hazards.py --skip-pmtiles                    # geometry only
-  python scripts/seed_noah_hazards.py --province Bukidnon               # filter by file stem
+  python scripts/seed_noah_hazards.py --province Bukidnon               # filter by province file stem
   python scripts/seed_noah_hazards.py --workers 4                       # default: cpu_count
   python scripts/seed_noah_hazards.py --list-files                      # inspect HF repo
   python scripts/seed_noah_hazards.py --force                           # re-download existing
@@ -367,12 +367,51 @@ def _replace_features(
 # Per-file worker — top-level for ProcessPoolExecutor pickling
 # ---------------------------------------------------------------------------
 
+def _serialize_city_rows(cities_gdf, city_infos: dict[str, "CityInfo"]) -> list[dict]:
+    """
+    Convert city GDF + infos into a picklable list of plain-Python dicts.
+    City boundaries are serialized as WKB bytes so workers never hit the DB.
+    """
+    import shapely.wkb
+    geom_map: dict[str, object] = dict(zip(cities_gdf["city_id_ref"], cities_gdf.geometry))
+    rows: list[dict] = []
+    for city_id, info in city_infos.items():
+        geom = geom_map.get(city_id)
+        if geom is None:
+            continue
+        try:
+            rows.append({
+                "id":   info.id,
+                "name": info.name,
+                "code": info.code,
+                "wkb":  shapely.wkb.dumps(geom),
+            })
+        except Exception:
+            pass
+    return rows
+
+
+def _clean_geodataframe(gdf):
+    """Strip M/Z coords and fix invalid geometries to avoid GEOS errors."""
+    import shapely
+    gdf = gdf.copy()
+    gdf["geometry"] = gdf["geometry"].apply(
+        lambda g: shapely.make_valid(shapely.force_2d(g))
+        if g is not None and not g.is_empty else g
+    )
+    return gdf[gdf["geometry"].notna() & ~gdf.geometry.is_empty].reset_index(drop=True)
+
+
 def _worker(task: dict) -> tuple[str, int]:
     """
-    Read one hazard GeoJSON, spatial-join with city boundaries,
+    Read one provincial hazard GeoJSON, spatial-join with city boundaries,
     generate per-city PMTiles, and insert HazardArea rows.
+
+    City data is passed pre-serialized as WKB bytes — no DB calls in workers
+    (forked processes must not reuse the parent's SQLAlchemy connection pool).
     """
     import geopandas as gpd
+    import shapely.wkb as _wkb
 
     os.environ["OGR_GEOJSON_MAX_OBJ_SIZE"] = "0"
 
@@ -380,9 +419,33 @@ def _worker(task: dict) -> tuple[str, int]:
     hazard_type:  str           = task["hazard_type"]
     scenario:     Optional[str] = task["scenario"]
     skip_pmtiles: bool          = task["skip_pmtiles"]
+    city_rows:    list[dict]    = task["city_rows"]
 
     stem = geojson_path.stem
-    total = 0
+
+    if not city_rows:
+        return stem, 0
+
+    # Reconstruct city data from pre-serialized WKB — no DB needed
+    city_infos:   dict[str, CityInfo] = {}
+    city_id_refs: list[str]           = []
+    geoms:        list                = []
+
+    for row in city_rows:
+        try:
+            geom = _wkb.loads(row["wkb"])
+            city_infos[row["id"]] = CityInfo(id=row["id"], name=row["name"], code=row["code"])
+            city_id_refs.append(row["id"])
+            geoms.append(geom)
+        except Exception:
+            pass
+
+    if not city_id_refs:
+        return stem, 0
+
+    cities_gdf = gpd.GeoDataFrame(
+        {"city_id_ref": city_id_refs}, geometry=geoms, crs="EPSG:4326"
+    )
 
     try:
         gdf = gpd.read_file(str(geojson_path))
@@ -398,26 +461,51 @@ def _worker(task: dict) -> tuple[str, int]:
     elif gdf.crs.to_epsg() != 4326:
         gdf = gdf.to_crs("EPSG:4326")
 
-    with SessionLocal() as db:
-        cities_gdf, city_infos = build_cities_gdf(db)
-
-    if cities_gdf.empty:
+    gdf = _clean_geodataframe(gdf)
+    if gdf.empty:
         return stem, 0
 
-    joined = gpd.sjoin(
-        gdf[["geometry"]], cities_gdf[["city_id_ref", "geometry"]],
-        how="inner", predicate="intersects",
-    )
-    joined = joined[~joined.index.duplicated(keep="first")]
+    try:
+        joined = gpd.sjoin(
+            gdf[["geometry"]], cities_gdf[["city_id_ref", "geometry"]],
+            how="inner", predicate="intersects",
+        )
+    except Exception as exc:
+        print(f"    [{stem}] sjoin failed: {exc}", flush=True)
+        return stem, 0
+
     joined = joined[joined["city_id_ref"].notna()]
 
     if joined.empty:
         return stem, 0
 
     scenario_slug = scenario or "all"
+    total = 0
+
     for city_id_str, group in joined.groupby("city_id_ref"):
         city = city_infos.get(str(city_id_str))
         if not city or not city.code:
+            continue
+
+        boundary_series = cities_gdf.loc[cities_gdf["city_id_ref"] == city_id_str, "geometry"]
+        if boundary_series.empty:
+            continue
+        city_boundary = boundary_series.iloc[0]
+
+        clipped_geoms = []
+        for geom in group["geometry"]:
+            try:
+                clipped = geom.intersection(city_boundary)
+                if clipped is not None and not clipped.is_empty:
+                    clipped_geoms.append(clipped)
+            except Exception:
+                pass
+
+        if not clipped_geoms:
+            continue
+
+        features = gpd.GeoDataFrame(geometry=clipped_geoms, crs="EPSG:4326")
+        if features.empty:
             continue
 
         pmtile_url = None
@@ -425,10 +513,10 @@ def _worker(task: dict) -> tuple[str, int]:
             minio_key = f"pmtiles/hazards/{hazard_type}/{scenario_slug}/city-{city.code}.pmtiles"
             with tempfile.TemporaryDirectory() as tmp:
                 slice_path = Path(tmp) / "slice.geojson"
-                group[["geometry"]].to_file(str(slice_path), driver="GeoJSON")
+                features[["geometry"]].to_file(str(slice_path), driver="GeoJSON")
                 pmtile_url = generate_pmtiles(slice_path, minio_key)
 
-        wkbs = [w for g in group.geometry if (w := _geom_to_wkb(g)) is not None]
+        wkbs = [w for g in features.geometry if (w := _geom_to_wkb(g)) is not None]
         count = _replace_features(city.id, hazard_type, scenario, pmtile_url, wkbs)
         total += count
 
@@ -451,7 +539,7 @@ def _process_national(
 ) -> None:
     import geopandas as gpd
 
-    print(f"  National: {geojson_path.stem} — spatial joining…", flush=True)
+    print(f"  National: {geojson_path.stem} — spatial-joining to cities…", flush=True)
     os.environ["OGR_GEOJSON_MAX_OBJ_SIZE"] = "0"
 
     try:
@@ -467,20 +555,51 @@ def _process_national(
     elif gdf.crs.to_epsg() != 4326:
         gdf = gdf.to_crs("EPSG:4326")
 
-    joined = gpd.sjoin(
-        gdf, cities_gdf[["city_id_ref", "geometry"]],
-        how="left", predicate="intersects",
-    )
-    joined = joined[~joined.index.duplicated(keep="first")]
+    # Strip M/Z coords and fix invalid geometries before any GEOS operation
+    gdf = _clean_geodataframe(gdf)
+    if gdf.empty:
+        return
+
+    try:
+        joined = gpd.sjoin(
+            gdf, cities_gdf[["city_id_ref", "geometry"]],
+            how="left", predicate="intersects",
+        )
+    except Exception as exc:
+        print(f"    sjoin failed: {exc}", flush=True)
+        return
     joined = joined[joined["city_id_ref"].notna()]
     if joined.empty:
         print("    no features intersect any city", flush=True)
         return
 
+    stem = geojson_path.stem
     scenario_slug = scenario or "all"
+
     for city_id_str, group in joined.groupby("city_id_ref"):
         city = city_infos.get(str(city_id_str))
         if not city or not city.code:
+            continue
+
+        boundary_series = cities_gdf.loc[cities_gdf["city_id_ref"] == city_id_str, "geometry"]
+        if boundary_series.empty:
+            continue
+        city_boundary = boundary_series.iloc[0]
+
+        clipped_geoms = []
+        for geom in group["geometry"]:
+            try:
+                clipped = geom.intersection(city_boundary)
+                if clipped is not None and not clipped.is_empty:
+                    clipped_geoms.append(clipped)
+            except Exception:
+                pass
+
+        if not clipped_geoms:
+            continue
+
+        features = gpd.GeoDataFrame(geometry=clipped_geoms, crs="EPSG:4326")
+        if features.empty:
             continue
 
         pmtile_url = None
@@ -488,11 +607,10 @@ def _process_national(
             minio_key = f"pmtiles/hazards/{hazard_type}/{scenario_slug}/city-{city.code}.pmtiles"
             with tempfile.TemporaryDirectory() as tmp:
                 slice_path = Path(tmp) / "slice.geojson"
-                cols = [c for c in group.columns if not c.startswith("index_")]
-                group[cols].to_file(str(slice_path), driver="GeoJSON")
+                features[["geometry"]].to_file(str(slice_path), driver="GeoJSON")
                 pmtile_url = generate_pmtiles(slice_path, minio_key)
 
-        wkbs = [w for g in group.geometry if (w := _geom_to_wkb(g)) is not None]
+        wkbs = [w for g in features.geometry if (w := _geom_to_wkb(g)) is not None]
         count = _replace_features(city.id, hazard_type, scenario, pmtile_url, wkbs)
         print(f"    [{city.name}] {count} rows", flush=True)
 
@@ -526,15 +644,15 @@ def _build_allowed_prefixes(
 
 
 def seed_hazard_source(
-    hazard_type:    str,
-    scenario:       Optional[str],
-    geojsons:       list[Path],
-    is_national:    bool,
+    hazard_type:     str,
+    scenario:        Optional[str],
+    geojsons:        list[Path],
+    is_national:     bool,
     cities_gdf,
-    city_infos:     dict[str, CityInfo],
-    skip_pmtiles:   bool,
-    workers:        int,
-    province_filter: Optional[str],
+    city_infos:      dict[str, CityInfo],
+    skip_pmtiles:    bool,
+    workers:         int,
+    province_filter: Optional[str] = None,
 ) -> None:
     if province_filter:
         geojsons = [g for g in geojsons if province_filter.lower() in g.stem.lower()]
@@ -551,12 +669,20 @@ def seed_hazard_source(
             _process_national(gj, hazard_type, scenario, cities_gdf, city_infos, skip_pmtiles)
         return
 
+    # Serialize city data once — passed to every worker to avoid DB calls in
+    # forked processes (SQLAlchemy connection pool is not fork-safe)
+    city_rows = _serialize_city_rows(cities_gdf, city_infos)
+    if not city_rows:
+        print("  no cities with serializable geometry — skipping", flush=True)
+        return
+
     tasks = [
         {
             "path":         gj,
             "hazard_type":  hazard_type,
             "scenario":     scenario,
             "skip_pmtiles": skip_pmtiles,
+            "city_rows":    city_rows,
         }
         for gj in geojsons
     ]
@@ -583,10 +709,10 @@ async def _async_run(
     hazard_filter:   Optional[list[str]],
     scenario_filter: Optional[list[str]],
     skip_pmtiles:    bool,
-    province_filter: Optional[str],
     workers:         int,
     list_files_only: bool,
     force:           bool,
+    province_filter: Optional[str] = None,
 ) -> None:
     token = get_hf_token()
     limits = httpx.Limits(
@@ -686,10 +812,10 @@ def run(
     hazard_filter:   Optional[list[str]],
     scenario_filter: Optional[list[str]],
     skip_pmtiles:    bool,
-    province_filter: Optional[str],
     workers:         int,
     list_files_only: bool,
     force:           bool,
+    province_filter: Optional[str] = None,
 ) -> None:
     if not skip_pmtiles and not list_files_only and not check_tippecanoe():
         print(
@@ -701,7 +827,7 @@ def run(
 
     asyncio.run(_async_run(
         hazard_filter, scenario_filter, skip_pmtiles,
-        province_filter, workers, list_files_only, force,
+        workers, list_files_only, force, province_filter,
     ))
 
 
@@ -735,8 +861,8 @@ if __name__ == "__main__":
         hazard_filter   = args.hazards,
         scenario_filter = args.scenarios,
         skip_pmtiles    = args.skip_pmtiles,
-        province_filter = args.province,
         workers         = args.workers,
         list_files_only = args.list_files,
         force           = args.force,
+        province_filter = args.province,
     )

@@ -1,27 +1,55 @@
 import base64
 import gzip
+import hashlib
+import hmac
 import json
 import time
 import uuid as _uuid
+from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from core.db import (
-    ACCESS_TOKEN_EXPIRE_SECONDS,
     ALGORITHM,
     JWT_COOKIE_NAME,
     REFRESH_COOKIE_NAME,
     REFRESH_TOKEN_EXPIRE_SECONDS,
     SECRET_KEY,
     SECURE_COOKIES,
+    get_db,
 )
 from models.user import User
-from utils.jwtUtils import create_jwt, get_db
 
 USER_CACHE_TTL = 900        # 15 min — matches access token expiry
 USER_CACHE_KEY = "user:{}"  # keyed by UUID string
+
+
+# ---------------------------------------------------------------------------
+# Password + token hashing
+# ---------------------------------------------------------------------------
+
+def hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def hash_password(password: str, salt: Optional[str] = None) -> str:
+    if salt is None:
+        salt = base64.urlsafe_b64encode(
+            hashlib.sha256(str(time.time_ns()).encode()).digest()
+        )[:16].decode()
+    digest = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+    return f"{salt}${digest}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, digest = stored.split("$", 1)
+    except ValueError:
+        return False
+    calc = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+    return hmac.compare_digest(calc, digest)
 
 
 # ---------------------------------------------------------------------------
@@ -63,23 +91,6 @@ def user_from_cache_dict(data: dict) -> User:
         created_at      = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
         updated_at      = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None,
     )
-
-
-# ---------------------------------------------------------------------------
-# Token minting
-# ---------------------------------------------------------------------------
-
-def mint_access_token(user: User, extra_claims: dict | None = None) -> str:
-    """Mint a short-lived access token, optionally embedding extra claims (e.g. city_id)."""
-    now = int(time.time())
-    payload = {
-        "sub":   str(user.id),
-        "email": user.email,
-        "iat":   now,
-        "exp":   now + int(ACCESS_TOKEN_EXPIRE_SECONDS),
-        **(extra_claims or {}),
-    }
-    return create_jwt(payload, key=SECRET_KEY, algorithm=ALGORITHM)
 
 
 # ---------------------------------------------------------------------------

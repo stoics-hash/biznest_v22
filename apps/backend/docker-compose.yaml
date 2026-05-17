@@ -3,24 +3,25 @@ services:
     image: postgis/postgis:latest
     container_name: biznest_potgres
     environment:
-      POSTGRES_USER: fastapi
-      POSTGRES_PASSWORD: fastapi
+      POSTGRES_USER: ${POSTGRES_USERNAME}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
       PGDATA: /var/lib/postgresql/data
     volumes:
       - biznest_db:/var/lib/postgresql/data
     ports:
-      - "5434:5432"
+      - "${POSTGRES_PORT}:5432"
     networks:
       - biznest_net
   minio:
     image: minio/minio:latest
     container_name: biznest_minio
     ports:
-      - "9001:9000"
-      - "9091:9090"
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_WEB_PORT}:9090"
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9090"
     networks:
       - biznest_net
@@ -30,7 +31,7 @@ services:
     image: redis:7-alpine
     container_name: biznest_redis
     ports:
-      - "6381:6379"
+      - "${REDIS_PORT}:6379"
     networks:
       - biznest_net
     volumes:
@@ -47,7 +48,23 @@ services:
     depends_on:
       - redis
     environment:
-      REDIS_HOSTS: redis:6381
+      REDIS_HOSTS: redis:${REDIS_PORT}
+
+#  biznest_app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: biznest_app
+#    ports:
+#      - "8000:8000"
+#    env_file:
+#      - .env
+#    depends_on:
+#      - postgres
+#      - minio
+#      - redis
+#    networks:
+#      - biznest_net
 
 volumes:
   biznest_db:

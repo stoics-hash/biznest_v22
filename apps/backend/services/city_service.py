@@ -6,6 +6,7 @@ from uuid import UUID
 
 import redis as redis_lib
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, defer
 
 from schema.CityDto import CityCreate, CityUpdate
@@ -14,10 +15,12 @@ from models.city import City
 _TTL_CITY      = 3600   # 1 h
 _TTL_CITY_LIST = 300    # 5 min
 _TTL_GEOMETRY  = 3600   # 1 h — geometry rarely changes
+_TTL_STATS     = 300    # 5 min
 
 _KEY_ALL      = "cities:all:v3"
 _KEY_ONE      = "city:{}:v3"
 _KEY_GEOMETRY = "city:geometry:{}"  # shared with investor_city_access_service
+_KEY_STATS    = "city:stats:{}"
 
 
 def _pack(data) -> str:
@@ -129,6 +132,45 @@ def get_city_geometry(
             pass
 
     return geometry
+
+
+def get_city_stats(city_id: UUID, db: Session, rc: redis_lib.Redis | None = None) -> dict:
+    key = _KEY_STATS.format(city_id)
+
+    if rc:
+        cached = rc.get(key)
+        if cached:
+            try:
+                return _unpack(cached)
+            except Exception:
+                rc.delete(key)
+
+    from models.hazard_area import HazardArea
+    from models.zoning_area import ZoningArea
+    from models.establishment import Establishment
+    from models.alert import Alert
+
+    hazard_count = db.query(func.count(HazardArea.id)).filter(HazardArea.city_id == city_id).scalar() or 0
+    zoning_count = db.query(func.count(ZoningArea.id)).filter(ZoningArea.city_id == city_id).scalar() or 0
+    est_count    = db.query(func.count(Establishment.id)).filter(Establishment.city_id == city_id).scalar() or 0
+    alert_count  = db.query(func.count(Alert.id)).filter(Alert.city_id == city_id).scalar() or 0
+
+    stats = {
+        "city_id":            str(city_id),
+        "hazard_count":       hazard_count,
+        "zoning_count":       zoning_count,
+        "establishment_count": est_count,
+        "alert_count":        alert_count,
+    }
+
+    if rc:
+        rc.setex(key, _TTL_STATS, _pack(stats))
+
+    return stats
+
+
+def invalidate_city_stats(city_id: UUID | str, rc: redis_lib.Redis) -> None:
+    rc.delete(_KEY_STATS.format(city_id))
 
 
 def create(payload: CityCreate, db: Session) -> City:

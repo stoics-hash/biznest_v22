@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { AlertTriangle, Building2, CreditCard, MapPin, Map, ArrowRight } from 'lucide-react'
+import { AlertTriangle, Building2, CreditCard, MapPin, Map, ArrowRight, Bell } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,15 +14,19 @@ export function DashboardPage() {
     role_name,
     cityIds,
     selectedCity,
-    hazards,
-    zoning,
+    hazardCount,
+    zoningCount,
+    establishmentCount,
+    alertCount,
     establishments,
     subscription,
     dataLoading,
+    statsLoaded,
   } = useDashboardData()
 
   const isInvestor = role_name === 'investor'
   const isLgu = role_name === 'lgu_admin'
+  const isEmpty = statsLoaded && hazardCount === 0 && zoningCount === 0 && establishmentCount === 0
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,10 +61,11 @@ export function DashboardPage() {
               Loading city data…
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-              <StatCard title="Hazard Areas" value={hazards.length} icon={AlertTriangle} />
-              <StatCard title="Zoning Areas" value={zoning.length} icon={Map} />
-              <StatCard title="Establishments" value={establishments.length} icon={Building2} />
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard title="Hazard Areas" value={hazardCount} icon={AlertTriangle} />
+              <StatCard title="Zoning Areas" value={zoningCount} icon={Map} />
+              <StatCard title="Establishments" value={establishmentCount} icon={Building2} />
+              {isLgu && <StatCard title="Alerts" value={alertCount} icon={Bell} />}
             </div>
           )}
 
@@ -87,18 +92,6 @@ export function DashboardPage() {
                   </span>
                 )}
               </CardContent>
-            </Card>
-          )}
-
-          {/* Recent hazards */}
-          {!dataLoading && hazards.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="text-base">Recent Hazards</CardTitle>
-                  <CardDescription>Latest recorded hazard areas in {selectedCity.name}</CardDescription>
-                </div>
-              </CardHeader>
             </Card>
           )}
 
@@ -139,7 +132,7 @@ export function DashboardPage() {
           )}
 
           {/* Empty state */}
-          {!dataLoading && hazards.length === 0 && zoning.length === 0 && establishments.length === 0 && (
+          {isEmpty && (
             <>
               <Separator />
               <div className="flex flex-col items-center gap-2 py-8 text-center">

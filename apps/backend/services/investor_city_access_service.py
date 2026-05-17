@@ -46,7 +46,7 @@ def revoke(access_id: UUID, db: Session) -> None:
 
 def select_city(user: User, city_id: UUID, db: Session) -> str:
     """Verify investor has access to city_id, then mint a new access token with city_id claim."""
-    from core.security import mint_access_token
+    from utils.jwtUtils import mint_access_token
 
     access = db.query(InvestorCityAccess).filter(
         InvestorCityAccess.user_id == user.id,

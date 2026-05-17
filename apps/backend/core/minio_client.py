@@ -1,10 +1,12 @@
 from minio import Minio
 import os
 
-MINIO_URL = os.environ.get("MINIO_URL")
-MINIO_USERNAME = os.environ.get("MINIO_USERNAME")
-MINIO_PASSWORD = os.environ.get("MINIO_PASSWORD")
-
+_minio_host = os.environ.get("MINIO_HOST", "localhost")
+_minio_port = os.environ.get("MINIO_PORT", "9000")
+MINIO_URL = f"{_minio_host}:{_minio_port}"
+MINIO_USERNAME = os.environ["MINIO_ROOT_USER"]
+MINIO_PASSWORD = os.environ["MINIO_ROOT_PASSWORD"]
+BUCKET_NAME = os.environ.get("MINIO_BUCKET", "uploads")
 
 minio_client = Minio(
     MINIO_URL,
@@ -12,8 +14,6 @@ minio_client = Minio(
     secret_key=MINIO_PASSWORD,
     secure=False,
 )
-
-BUCKET_NAME = "uploads"
 
 if not minio_client.bucket_exists(BUCKET_NAME):
     minio_client.make_bucket(BUCKET_NAME)

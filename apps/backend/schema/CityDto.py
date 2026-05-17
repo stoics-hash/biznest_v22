@@ -53,3 +53,11 @@ class CityResponse(BaseModel):
     province_id: UUID | None
     pmtile_url:  str | None
     created_at:  datetime
+
+
+class CityStatsResponse(BaseModel):
+    city_id: UUID
+    hazard_count: int
+    zoning_count: int
+    establishment_count: int
+    alert_count: int

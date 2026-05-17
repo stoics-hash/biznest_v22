@@ -29,6 +29,7 @@ import type {
   CityCreate,
   CityGeometryResponse,
   CityResponse,
+  CityStatsResponse,
   CityUpdate,
   HTTPValidationError
 } from '../../model';
@@ -409,6 +410,72 @@ export function useGetCityGeometryCitiesCityIdGeometryGet<TData = Awaited<Return
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCityGeometryCitiesCityIdGeometryGetQueryOptions(cityId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+/**
+ * @summary Get City Stats
+ */
+export const getCityStatsCitiesCityIdStatsGet = (
+    cityId: string, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<CityStatsResponse>> => {
+
+
+    return axios.default.get(
+      `/cities/${cityId}/stats`,options
+    );
+  }
+
+
+
+
+export const getGetCityStatsCitiesCityIdStatsGetQueryKey = (cityId: string,) => {
+    return [
+    `/cities/${cityId}/stats`
+    ] as const;
+    }
+
+
+export const getGetCityStatsCitiesCityIdStatsGetQueryOptions = <TData = Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>, TError, TData>, axios?: AxiosRequestConfig}
+) => {
+
+const {query: queryOptions, axios: axiosOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCityStatsCitiesCityIdStatsGetQueryKey(cityId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>> = ({ signal }) => getCityStatsCitiesCityIdStatsGet(cityId, { signal, ...axiosOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCityStatsCitiesCityIdStatsGetQueryResult = NonNullable<Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>>
+export type GetCityStatsCitiesCityIdStatsGetQueryError = AxiosError<HTTPValidationError>
+
+
+/**
+ * @summary Get City Stats
+ */
+
+export function useGetCityStatsCitiesCityIdStatsGet<TData = Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>, TError = AxiosError<HTTPValidationError>>(
+ cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCityStatsCitiesCityIdStatsGet>>, TError, TData>, axios?: AxiosRequestConfig}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCityStatsCitiesCityIdStatsGetQueryOptions(cityId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
