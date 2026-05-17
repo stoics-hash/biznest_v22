@@ -421,6 +421,7 @@ export class MapEngine {
           type: 'line',
           source: sourceId,
           'source-layer': srcLayer,
+          layout: { visibility: 'none' },
           paint: {
             'line-color': color,
             'line-width': 2,
@@ -433,6 +434,7 @@ export class MapEngine {
           type: 'fill',
           source: sourceId,
           'source-layer': srcLayer,
+          layout: { visibility: 'none' },
           paint: {
             'fill-color': color,
             'fill-opacity': this._hazardOpacity(tile.scenario),
@@ -495,6 +497,7 @@ export class MapEngine {
       type: 'fill',
       source: ZONING_SOURCE,
       'source-layer': sourceLayer,
+      layout: { visibility: 'none' },
       paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.65 },
     }, beforeId)
     this._map.addLayer({
@@ -502,6 +505,7 @@ export class MapEngine {
       type: 'line',
       source: ZONING_SOURCE,
       'source-layer': sourceLayer,
+      layout: { visibility: 'none' },
       paint: { 'line-color': ['get', 'color'], 'line-width': 1, 'line-opacity': 0.9 },
     }, beforeId)
     onReady?.()

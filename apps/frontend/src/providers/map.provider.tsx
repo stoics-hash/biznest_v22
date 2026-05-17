@@ -41,15 +41,9 @@ export function MapProvider({ children }: PropsWithChildren) {
   const [show3D, setShow3D] = useState(true)
   const [hazardLayers, setHazardLayersState] = useState<HazardTile[]>([])
   const [visibleHazardKeys, setVisibleHazardKeys] = useState<Set<string>>(new Set())
-  const [showAllHazards, setShowAllHazards] = useState(() => {
-    const s = localStorage.getItem('biznest:show_all_hazards')
-    return s === null ? true : s === 'true'
-  })
+  const [showAllHazards, setShowAllHazards] = useState(true)
   const [zoningTile, setZoningTile] = useState<{ url: string; sourceLayer: string } | null>(null)
-  const [showZoning, setShowZoning] = useState(() => {
-    const s = localStorage.getItem('biznest:show_zoning')
-    return s === null ? true : s === 'true'
-  })
+  const [showZoning, setShowZoning] = useState(false)
   const [visibleZoningTypes, setVisibleZoningTypes] = useState<Set<string> | null>(null)
   const [clickedZone, setClickedZone] = useState<ClickedZone | null>(null)
 
@@ -60,11 +54,6 @@ export function MapProvider({ children }: PropsWithChildren) {
   showZoningRef.current = showZoning
   const visibleZoningTypesRef = useRef(visibleZoningTypes)
   visibleZoningTypesRef.current = visibleZoningTypes
-
-  // ── Persist visibility toggles ────────────────────────────────────────────
-
-  useEffect(() => { localStorage.setItem('biznest:show_zoning', String(showZoning)) }, [showZoning])
-  useEffect(() => { localStorage.setItem('biznest:show_all_hazards', String(showAllHazards)) }, [showAllHazards])
 
   // ── Light preset ─────────────────────────────────────────────────────────
 
@@ -112,7 +101,7 @@ export function MapProvider({ children }: PropsWithChildren) {
         const tiles = await enrichWithSourceLayers(res.data as HazardTile[])
         if (cancelled) return
         setHazardLayersState(tiles)
-        setVisibleHazardKeys(new Set(tiles.map(t => `${t.hazard_type}::${t.scenario ?? 'all'}`)))
+        setVisibleHazardKeys(new Set())
       })
       .catch(() => {
         // Province has no hazard data yet.
@@ -149,6 +138,7 @@ export function MapProvider({ children }: PropsWithChildren) {
       cancelled = true
       setZoningTile(null)
       setVisibleZoningTypes(null)
+      setShowZoning(false)
     }
   }, [selectedCity?.id])
 
