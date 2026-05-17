@@ -1,32 +1,26 @@
 import { Link } from '@tanstack/react-router'
-import { AlertTriangle, Building2, CreditCard, MapPin, Map, ArrowRight, Bell } from 'lucide-react'
-import { Spinner } from '@/components/ui/spinner'
-import { Badge } from '@/components/ui/badge'
+import { MapPin, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { useDashboardData } from './composables/use-dashboard-data'
-import { StatCard } from './components/stat-card'
+import { useAuthContext } from '@/context/auth.context'
+import { useCityContext } from '@/context/city.context'
+import { getWidgetsForRole } from '@/config/widgets.config'
+
+const COL_SPAN_CLASS: Record<number, string> = {
+  1: 'col-span-1',
+  2: 'col-span-1 md:col-span-2',
+  3: 'col-span-1 md:col-span-2 lg:col-span-3',
+}
 
 export function DashboardPage() {
-  const {
-    user,
-    role_name,
-    cityIds,
-    selectedCity,
-    hazardCount,
-    zoningCount,
-    establishmentCount,
-    alertCount,
-    establishments,
-    subscription,
-    dataLoading,
-    statsLoaded,
-  } = useDashboardData()
+  const { state } = useAuthContext()
+  const { selectedCity, cityId } = useCityContext()
 
+  const auth = state.state === 'AUTHENTICATED' ? state : null
+  const user = auth?.user ?? null
+  const role_name = auth?.role_name ?? null
   const isInvestor = role_name === 'investor'
-  const isLgu = role_name === 'lgu_admin'
-  const isEmpty = statsLoaded && hazardCount === 0 && zoningCount === 0 && establishmentCount === 0
+
+  const widgets = getWidgetsForRole(role_name, cityId)
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,119 +32,33 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {/* No city selected */}
-      {!selectedCity && (
+      {/* No city selected (investors only) */}
+      {isInvestor && !selectedCity && (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-center">
           <MapPin className="size-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">No city selected.</p>
           <Button variant="outline" size="sm" asChild>
             <Link to="/cities">
-              {isLgu ? 'Go to Cities' : 'Select a City'}
+              Select a City
               <ArrowRight className="ml-1.5 size-3.5" />
             </Link>
           </Button>
         </div>
       )}
 
-      {selectedCity && (
-        <>
-          {/* Stat cards */}
-          {dataLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner className="size-4" />
-              Loading city data…
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <StatCard title="Hazard Areas" value={hazardCount} icon={AlertTriangle} />
-              <StatCard title="Zoning Areas" value={zoningCount} icon={Map} />
-              <StatCard title="Establishments" value={establishmentCount} icon={Building2} />
-              {isLgu && <StatCard title="Alerts" value={alertCount} icon={Bell} />}
-            </div>
-          )}
-
-          {/* Subscription (investor only) */}
-          {isInvestor && subscription && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="text-base">Subscription</CardTitle>
-                  <CardDescription>Your current plan</CardDescription>
-                </div>
-                <Badge variant="secondary" className="capitalize">{subscription.plan.name}</Badge>
-              </CardHeader>
-              <CardContent className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <CreditCard className="size-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">
-                    {cityIds.length} / {subscription.plan.max_cities ?? '∞'} cities used
-                  </span>
-                </div>
-                {subscription.expires_at && (
-                  <span className="text-muted-foreground ml-auto">
-                    Expires {new Date(subscription.expires_at).toLocaleDateString()}
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Recent establishments */}
-          {!dataLoading && establishments.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="text-base">Establishments</CardTitle>
-                  <CardDescription>Businesses and points of interest in {selectedCity.name}</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/map">
-                    View on Map
-                    <ArrowRight className="ml-1.5 size-3.5" />
-                  </Link>
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {establishments.slice(0, 6).map(e => (
-                    <div
-                      key={e.id}
-                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                    >
-                      <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate font-medium">{e.name}</span>
-                      {e.category && (
-                        <Badge variant="outline" className="ml-auto shrink-0 text-xs capitalize">
-                          {e.category}
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Empty state */}
-          {isEmpty && (
-            <>
-              <Separator />
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No data recorded for {selectedCity.name} yet.
-                </p>
-                {isLgu && (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/map">
-                      Manage city data
-                      <ArrowRight className="ml-1.5 size-3.5" />
-                    </Link>
-                  </Button>
-                )}
+      {/* Widget grid */}
+      {widgets.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {widgets.map(widget => {
+            const span = widget.colSpan ?? 1
+            const Widget = widget.component
+            return (
+              <div key={widget.id} className={COL_SPAN_CLASS[span]}>
+                <Widget />
               </div>
-            </>
-          )}
-        </>
+            )
+          })}
+        </div>
       )}
     </div>
   )

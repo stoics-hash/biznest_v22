@@ -31,13 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import {
-  investorNavSections,
-  lguNavSections,
-  defaultNavSections,
-  administrationNavSections,
-  type NavSection,
-} from '@/config/navigation'
+import { getNavSections, type NavSection } from '@/config/navigation'
 import { MessageWidget } from '@/components/message-widget'
 
 function NavItems({ sections }: { sections: NavSection[] }) {
@@ -170,16 +164,7 @@ export function AuthenticatedLayout() {
   const isFullscreenMap = FULLSCREEN_MAP_PATHS.some(p => location.pathname.startsWith(p))
   const { user, role_name, city_ids } = state
 
-  const baseSections =
-    role_name === 'investor'
-      ? investorNavSections
-      : role_name === 'lgu_admin'
-        ? lguNavSections
-        : defaultNavSections
-
-  const sections = user.is_superuser
-    ? [...baseSections, ...administrationNavSections]
-    : baseSections
+  const sections = getNavSections(state.permissions ?? [])
 
   return (
     <TooltipProvider delayDuration={0}>

@@ -11,19 +11,33 @@ import { router } from '@/router'
 import { AuthContext, type AuthAction, type AuthData, type AuthState } from '@/context/auth.context'
 import type { UserResponse } from '@networking/api/model/userResponse'
 import type { CityResponse } from '@networking/api/model/cityResponse'
+import { PERMISSION } from '@/config/permissions'
 
-// Permissions seeded per role in backend core/seed.py
+// Mirrors backend core/seed.py — used for frontend UI gating only.
+const ALL_PERMISSIONS = Object.values(PERMISSION)
+
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  investor: ['city:view', 'zoning:read', 'hazard:read', 'establishment:read', 'analytics:view', 'location:save'],
-  lgu_admin: [
-    'city:view',
-    'zoning:read', 'zoning:write',
-    'hazard:read', 'hazard:write',
-    'establishment:read', 'establishment:write',
-    'alert:read', 'alert:write',
-    'analytics:view',
-    'location:save',
+  investor: [
+    PERMISSION.ZONING_READ,
+    PERMISSION.HAZARD_READ,
+    PERMISSION.ESTABLISHMENT_READ,
+    PERMISSION.ANALYTICS_VIEW,
+    PERMISSION.LOCATION_SAVE,
+    PERMISSION.VIEW_MAP,
+    PERMISSION.MANAGE_SUBSCRIPTION,
   ],
+  lgu_admin: [
+    PERMISSION.MANAGE_CITY,
+    PERMISSION.ZONING_READ,        PERMISSION.ZONING_WRITE,
+    PERMISSION.HAZARD_READ,        PERMISSION.HAZARD_WRITE,
+    PERMISSION.ESTABLISHMENT_READ, PERMISSION.ESTABLISHMENT_WRITE,
+    PERMISSION.ALERTS_READ,        PERMISSION.ALERTS_WRITE,
+    PERMISSION.ANALYTICS_VIEW,
+    PERMISSION.LOCATION_SAVE,
+    PERMISSION.VIEW_MAP,
+    PERMISSION.MANAGE_LOGS,
+  ],
+  admin: ALL_PERMISSIONS,
 }
 
 // Paths that should not trigger the 401 → refresh interceptor
@@ -113,7 +127,9 @@ function resolveRoleFromToken(): { role_name: string | null; role_id: string | n
 
 async function resolveAuth(user: UserResponse) {
   const { role_name } = resolveRoleFromToken()
-  const permissions = role_name ? (ROLE_PERMISSIONS[role_name] ?? []) : []
+  const permissions = user.is_superuser
+    ? ALL_PERMISSIONS
+    : role_name ? (ROLE_PERMISSIONS[role_name] ?? []) : []
 
   let city_ids: string[] = []
   let lgu_city: CityResponse | undefined
