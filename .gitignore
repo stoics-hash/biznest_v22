@@ -16,8 +16,7 @@ build/
 
 # Package managers
 # Generated API client
-packages/api/generated/
-packages/api/model/
+packages/api/
 
 # Node.js
 node_modules/

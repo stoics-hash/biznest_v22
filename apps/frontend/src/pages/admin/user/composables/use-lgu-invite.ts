@@ -1,40 +1,72 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import axios from 'axios'
 import type { AxiosError } from 'axios'
-import { listCitiesCitiesGet } from '@networking/api/generated/cities/cities'
-import { inviteLguAdminUsersLguInvitePost } from '@networking/api/generated/users/users'
-import type { LguInviteResponse } from '@networking/api/model'
+import type { LguInviteResponse } from '@networking/api/model/lguInviteResponse'
+
+interface RegionOption { id: string; name: string }
+interface ProvinceOption { id: string; name: string }
+interface CityOption { id: string; name: string }
 
 function getErrorMessage(err: unknown): string {
-  const axiosErr = err as AxiosError<{ detail?: string }>
-  return axiosErr?.response?.data?.detail ?? 'Something went wrong. Please try again.'
+  const axiosErr = err as AxiosError<{ detail?: string | Array<{ msg: string }> }>
+  const detail = axiosErr?.response?.data?.detail
+  if (Array.isArray(detail)) return detail.map(e => e.msg).join('; ')
+  if (typeof detail === 'string') return detail
+  return 'Something went wrong. Please try again.'
 }
 
 export function useLguInvite() {
   const [email, setEmail] = useState('')
-  const [cityId, setCityId] = useState<string | null>(null)
-  const [citySearch, setCitySearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [regionId, setRegionIdState] = useState<string | null>(null)
+  const [provinceId, setProvinceIdState] = useState<string | null>(null)
+  const [cityId, setCityIdState] = useState<string | null>(null)
   const [result, setResult] = useState<LguInviteResponse | null>(null)
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(citySearch), 300)
-    return () => clearTimeout(t)
-  }, [citySearch])
+  function setRegionId(id: string | null) {
+    setRegionIdState(id)
+    setProvinceIdState(null)
+    setCityIdState(null)
+  }
 
-  const { data: cities = [], isLoading: citiesLoading } = useQuery({
-    queryKey: ['/cities/', debouncedSearch],
-    queryFn: () => listCitiesCitiesGet(
-      undefined,
-      debouncedSearch ? { params: { q: debouncedSearch } } : undefined
-    ).then(r => r.data),
-    enabled: debouncedSearch.length >= 2,
+  function setProvinceId(id: string | null) {
+    setProvinceIdState(id)
+    setCityIdState(null)
+  }
+
+  function setCityId(id: string | null) {
+    setCityIdState(id)
+  }
+
+  const { data: regions = [], isLoading: regionsLoading } = useQuery<RegionOption[]>({
+    queryKey: ['/regions/'],
+    queryFn: () =>
+      axios.get<RegionOption[]>('/regions/').then(r => r.data),
   })
 
-  const { mutateAsync: sendInvite, isPending: sending, error: mutationError, reset: resetMutation } = useMutation({
+  const { data: provinces = [], isLoading: provincesLoading } = useQuery<ProvinceOption[]>({
+    queryKey: ['/regions', regionId, 'provinces'],
+    queryFn: () =>
+      axios.get<ProvinceOption[]>(`/regions/${regionId}/provinces`).then(r => r.data),
+    enabled: !!regionId,
+  })
+
+  const { data: cities = [], isLoading: citiesLoading } = useQuery<CityOption[]>({
+    queryKey: ['/provinces', provinceId, 'cities'],
+    queryFn: () =>
+      axios.get<CityOption[]>(`/provinces/${provinceId}/cities`).then(r => r.data),
+    enabled: !!provinceId,
+  })
+
+  const {
+    mutateAsync: sendInvite,
+    isPending: sending,
+    error: mutationError,
+    reset: resetMutation,
+  } = useMutation({
     mutationFn: ({ email, city_id }: { email: string; city_id: string }) =>
-      inviteLguAdminUsersLguInvitePost({ email, city_id }).then(r => r.data),
+      axios.post<LguInviteResponse>('/users/lgu/invite', { email, city_id }).then(r => r.data),
     onSuccess: (data) => setResult(data),
   })
 
@@ -48,17 +80,20 @@ export function useLguInvite() {
 
   function reset() {
     setEmail('')
-    setCityId(null)
-    setCitySearch('')
-    setDebouncedSearch('')
+    setRegionIdState(null)
+    setProvinceIdState(null)
+    setCityIdState(null)
     setResult(null)
     resetMutation()
   }
 
   return {
     email, setEmail,
+    regionId, setRegionId,
+    provinceId, setProvinceId,
     cityId, setCityId,
-    citySearch, setCitySearch,
+    regions, regionsLoading,
+    provinces, provincesLoading,
     cities, citiesLoading,
     sending,
     error,
