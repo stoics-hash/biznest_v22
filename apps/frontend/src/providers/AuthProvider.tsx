@@ -29,15 +29,17 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 // Paths that should not trigger the 401 → refresh interceptor
 const AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/users/lgu/register']
 
-// sessionStorage keys
 const CITY_ID_KEY = 'biznest:city_id'
+
+// Refresh this many ms before the access token actually expires
+const PROACTIVE_REFRESH_LEAD_MS = 60_000
 
 interface AuthApiResponse {
   access_token: string
-  refresh_token: string
   id: string
   email: string
   full_name: string
+  expires_in: number
 }
 
 interface CitySelectApiResponse {
@@ -71,6 +73,17 @@ function authReducer(_state: AuthState, action: AuthAction): AuthState {
   }
 }
 
+function getTokenExpiry(token: string): number | null {
+  try {
+    // Base64url → base64 → JSON
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(b64)) as { exp?: number }
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch {
+    return null
+  }
+}
+
 async function resolveAuth(user: UserResponse) {
   const rolesRes = await getUserRolesUserRolesUserIdGet(user.id)
   const userRole = rolesRes.data[0] ?? null
@@ -99,8 +112,52 @@ async function resolveAuth(user: UserResponse) {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(authReducer, { state: 'BOOT' } as AuthState)
 
-  const isRefreshingRef = useRef(false)
-  const refreshQueueRef = useRef<QueueItem[]>([])
+  const isRefreshingRef   = useRef(false)
+  const refreshQueueRef   = useRef<QueueItem[]>([])
+  const refreshTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Ref so the interceptor (set up once in useEffect) always calls the latest version
+  const scheduleRefreshRef = useRef<((token: string) => void) | null>(null)
+
+  // ── Proactive refresh helpers ─────────────────────────────────────────────
+
+  function clearRefreshTimer() {
+    if (refreshTimerRef.current !== null) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+  }
+
+  async function doProactiveRefresh() {
+    try {
+      const res = await axios.post<AuthApiResponse>('/auth/refresh')
+      tokenManager.set(res.data.access_token)
+      scheduleRefreshRef.current?.(res.data.access_token)
+    } catch {
+      // Refresh token expired or revoked — force sign-out
+      clearRefreshTimer()
+      tokenManager.clear()
+      sessionStorage.removeItem(CITY_ID_KEY)
+      dispatch({ type: 'UNAUTHENTICATED' })
+      void router.navigate({ to: '/login' })
+    }
+  }
+
+  function scheduleTokenRefresh(accessToken: string) {
+    clearRefreshTimer()
+    const exp = getTokenExpiry(accessToken)
+    if (exp === null) return
+    const delay = exp * 1000 - Date.now() - PROACTIVE_REFRESH_LEAD_MS
+    if (delay <= 0) {
+      void doProactiveRefresh()
+      return
+    }
+    refreshTimerRef.current = setTimeout(() => void doProactiveRefresh(), delay)
+  }
+
+  // Keep ref pointing at latest version so interceptor can use it
+  scheduleRefreshRef.current = scheduleTokenRefresh
+
+  // ── 401 interceptor + session restore ─────────────────────────────────────
 
   useEffect(() => {
     const interceptorId = axios.interceptors.response.use(
@@ -126,15 +183,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
         isRefreshingRef.current = true
 
         try {
-          // Refresh cookie is HttpOnly — browser sends it automatically to /auth/refresh
           const refreshRes = await axios.post<AuthApiResponse>('/auth/refresh')
           tokenManager.set(refreshRes.data.access_token)
+          // Reschedule proactive refresh with the rotated token
+          scheduleRefreshRef.current?.(refreshRes.data.access_token)
           refreshQueueRef.current.forEach(q => q.resolve(undefined))
           refreshQueueRef.current = []
           return axios(originalRequest)
         } catch (refreshError) {
           refreshQueueRef.current.forEach(q => q.reject(refreshError))
           refreshQueueRef.current = []
+          clearRefreshTimer()
           tokenManager.clear()
           sessionStorage.removeItem(CITY_ID_KEY)
           dispatch({ type: 'UNAUTHENTICATED' })
@@ -150,13 +209,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     return () => {
       axios.interceptors.response.eject(interceptorId)
+      clearRefreshTimer()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Auth actions ──────────────────────────────────────────────────────────
 
   async function restoreSession() {
     dispatch({ type: 'RESTORE_START' })
     try {
-      // GET /auth/me — if access token expired, interceptor refreshes automatically
+      // If access token expired the 401 interceptor refreshes it transparently
       const userRes = await axios.get<UserResponse>('/auth/me')
       const result = await resolveAuth(userRes.data)
 
@@ -170,7 +233,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
             tokenManager.set(selectRes.data.access_token)
             city_id = savedCityId
           } catch {
-            // Access may have been revoked — drop saved city
             sessionStorage.removeItem(CITY_ID_KEY)
           }
         }
@@ -180,7 +242,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       dispatch({ type: 'AUTH_SUCCESS', ...result, city_id })
+
+      // Schedule proactive refresh — covers both fresh tokens and post-interceptor-refresh tokens
+      const currentToken = tokenManager.get()
+      if (currentToken) scheduleTokenRefresh(currentToken)
     } catch {
+      clearRefreshTimer()
       tokenManager.clear()
       sessionStorage.removeItem(CITY_ID_KEY)
       dispatch({ type: 'UNAUTHENTICATED' })
@@ -190,9 +257,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   async function signIn(email: string, password: string) {
     const loginRes = await axios.post<AuthApiResponse>('/auth/login', { email, password })
     tokenManager.set(loginRes.data.access_token)
+    scheduleTokenRefresh(loginRes.data.access_token)
     const userRes = await axios.get<UserResponse>('/auth/me')
     const result = await resolveAuth(userRes.data)
-    // Always go to city-setup on fresh login — no city pre-selection
     sessionStorage.removeItem(CITY_ID_KEY)
     dispatch({ type: 'AUTH_SUCCESS', ...result })
     await router.navigate({ to: '/city-setup' })
@@ -206,6 +273,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   ) {
     const registerRes = await axios.post<AuthApiResponse>('/auth/register', { email, full_name, password, role_name: role })
     tokenManager.set(registerRes.data.access_token)
+    scheduleTokenRefresh(registerRes.data.access_token)
     const userRes = await axios.get<UserResponse>('/auth/me')
     const result = await resolveAuth(userRes.data)
     sessionStorage.removeItem(CITY_ID_KEY)
@@ -215,6 +283,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   async function signOut() {
     dispatch({ type: 'SIGN_OUT' })
+    clearRefreshTimer()
     try {
       await axios.post('/auth/logout')
     } finally {
@@ -228,7 +297,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
   async function refreshCities() {
     if (state.state !== 'AUTHENTICATED') return
     const result = await resolveAuth(state.user)
-    // Preserve investor's selected city; update LGU city if assignment changed
     let city_id = state.city_id
     if (result.role_name === 'lgu_admin' && result.lgu_city) {
       city_id = result.lgu_city.id
@@ -241,11 +309,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (state.state !== 'AUTHENTICATED') return
 
     if (state.role_name === 'investor') {
-      // Get new JWT with city_id embedded from backend
       const res = await axios.post<CitySelectApiResponse>(`/city-access/select/${cityId}`)
       tokenManager.set(res.data.access_token)
+      scheduleTokenRefresh(res.data.access_token)
     }
-    // LGU: city comes from assignment, no select endpoint needed
 
     sessionStorage.setItem(CITY_ID_KEY, cityId)
     dispatch({ type: 'SET_CITY', city_id: cityId })

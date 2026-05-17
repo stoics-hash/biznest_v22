@@ -38,6 +38,7 @@ import {
   administrationNavSections,
   type NavSection,
 } from '@/config/navigation'
+import { MessageWidget } from '@/components/message-widget'
 
 function NavItems({ sections }: { sections: NavSection[] }) {
   const { location } = useRouterState()
@@ -157,7 +158,12 @@ export function AppShell() {
   if (state.state !== 'AUTHENTICATED') return null
 
   if (FULLSCREEN_PATHS.some(p => location.pathname.startsWith(p))) {
-    return <Outlet />
+    return (
+      <>
+        <Outlet />
+        <MessageWidget />
+      </>
+    )
   }
 
   const isMapPath = MAP_PATHS.some(p => location.pathname.startsWith(p))
@@ -255,6 +261,7 @@ export function AppShell() {
           )}
         </SidebarInset>
       </SidebarProvider>
+      <MessageWidget />
     </TooltipProvider>
   )
 }
