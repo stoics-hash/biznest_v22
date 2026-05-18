@@ -8,8 +8,8 @@ import { LogOut, MapPin, ChevronsUpDown, Check, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthContext } from "@/context/auth.context";
 import { useCityContext } from "@/context/city.context";
-import { listCitiesCitiesGet } from "../../../../packages/api/generated/cities/cities";
-import type { CityResponse } from "../../../../packages/api/model/cityResponse";
+import { listCitiesCitiesGet } from "@networking/api/generated/cities/cities";
+import type { CityResponse } from "@networking/api/model/cityResponse";
 import {
   Sidebar,
   SidebarContent,
@@ -36,7 +36,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ModeToggle } from "@/components/ui/mode-toggle";
 import { getNavSections, type NavSection } from "@/config/navigation";
 import { MessageWidget } from "@/components/message-widget";
 
@@ -83,7 +82,7 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
   const { selectedCity, selectCity } = useCityContext();
   const navigate = useNavigate();
 
-  const { data: allCities = [] } = useQuery<CityResponse[]>({
+  const { data: allCities = [] } = useQuery({
     queryKey: ["/cities/"],
     queryFn: () => listCitiesCitiesGet().then((r) => r.data),
     enabled: cityIds.length > 0,
@@ -159,9 +158,12 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
   );
 }
 
+// Bare outlet — no sidebar, no overflow constraint (scrollable content)
 const FULLSCREEN_PATHS = ["/city-setup"];
-const MAP_PATHS = ["/map", "/zoning"];
-const FULLSCREEN_MAP_PATHS = ["/zoning/zoning-map"];
+// Bare outlet — no sidebar, overflow-hidden so the map canvas fills the viewport
+const FULLSCREEN_MAP_CANVAS_PATHS = ["/hazard", "/zoning"];
+const MAP_PATHS = ["/map"];
+const FULLSCREEN_MAP_PATHS: string[] = [];
 
 export function AuthenticatedLayout() {
   const { state, signOut } = useAuthContext();
@@ -173,6 +175,19 @@ export function AuthenticatedLayout() {
     return (
       <>
         <Outlet />
+        <MessageWidget />
+      </>
+    );
+  }
+
+  if (
+    FULLSCREEN_MAP_CANVAS_PATHS.some((p) => location.pathname.startsWith(p))
+  ) {
+    return (
+      <>
+        <div className="h-screen w-full overflow-hidden">
+          <Outlet />
+        </div>
         <MessageWidget />
       </>
     );
@@ -260,9 +275,6 @@ export function AuthenticatedLayout() {
             <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
               <SidebarTrigger className="-ml-1" />
               <Separator orientation="vertical" className="mx-1 h-4" />
-              <div className="ml-auto flex items-center gap-2">
-                <ModeToggle />
-              </div>
             </header>
           )}
           {isMapPath || isFullscreenMap ? (
