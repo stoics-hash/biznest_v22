@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { BrandIcon } from "@/config/navigation";
 import { Footer } from "@/components/footer";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 
 export function GuestLayout({ children }: PropsWithChildren) {
   return (
@@ -24,6 +25,8 @@ export function GuestLayout({ children }: PropsWithChildren) {
             <Button variant="ghost" size="sm" asChild>
               <Link to={"/about" as never}>About</Link>
             </Button>
+            <div className="mx-2 h-4 w-px bg-border" />
+            <ModeToggle />
             <div className="mx-2 h-4 w-px bg-border" />
             <Button variant="ghost" size="sm" asChild>
               <Link to={"/login" as never}>Sign in</Link>
