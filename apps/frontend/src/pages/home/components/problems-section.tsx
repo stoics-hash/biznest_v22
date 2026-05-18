@@ -1,4 +1,5 @@
 import { Check, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { H2, H3, Muted } from "@/components/ui/typography";
 
 const problems = [
@@ -38,7 +39,7 @@ function ProblemCard({
 }: {
   title: string;
   points: string[];
-  icon: any;
+  icon: LucideIcon;
   iconBg: string;
   iconColor: string;
 }) {
@@ -74,7 +75,7 @@ export function ProblemsSection() {
         <div className="mx-auto mb-14 max-w-4xl text-center md:mb-16">
           <H2 className="border-0 pb-0">
             Finding a profitable location is usually a guessing game.{" "}
-            <span className="text-primary">We turned it into a science.</span>
+            <span className="text-accent">We turned it into a science.</span>
           </H2>
         </div>
 
