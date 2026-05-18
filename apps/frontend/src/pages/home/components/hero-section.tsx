@@ -18,8 +18,9 @@ export function HeroSection() {
           <Small className="mb-4">For Growth-Minded Founders</Small>
 
           <H1 className="mb-3">
-            Smart <span className="text-primary">Locations.</span> Stronger{" "}
-            <span className="text-primary">Connections.</span> Powered by AI.
+            <span className="text-accent">Smart</span> Locations.{" "}
+            <span className="text-accent">Stronger </span>
+            Connections. Powered by <span className="text-accent">AI</span>.
           </H1>
 
           <Lead className="mb-6 max-w-xl">
