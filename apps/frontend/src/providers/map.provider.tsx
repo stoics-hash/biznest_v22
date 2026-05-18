@@ -235,6 +235,16 @@ export function MapProvider({ children }: PropsWithChildren) {
     setZoningTile({ url, sourceLayer: sl ?? 'zoning' })
   }, [])
 
+  const refreshHazardLayers = useCallback(async () => {
+    if (!selectedCity?.id) return
+    try {
+      const res   = await listHazardPmtilesCitiesCityIdHazardsPmtilesGet(selectedCity.id)
+      const tiles = await enrichWithSourceLayers(res.data as HazardTile[])
+      setHazardLayersState(tiles)
+    } catch { /* city has no hazard data */ }
+  }, [selectedCity?.id])
+
+
   return (
     <MapContext.Provider value={{
       engine, setEngine,
@@ -255,6 +265,7 @@ export function MapProvider({ children }: PropsWithChildren) {
       clickedZone,
       setClickedZone,
       refreshZoningLayer,
+      refreshHazardLayers,
     }}>
       {children}
     </MapContext.Provider>

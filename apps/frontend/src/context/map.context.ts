@@ -42,6 +42,8 @@ export interface MapData {
   setClickedZone: (zone: ClickedZone | null) => void
   /** Re-fetch source-layer from new URL then swap the engine's zoning layer. Pass null to clear entirely. */
   refreshZoningLayer: (url: string | null) => Promise<void>
+  /** Re-fetch hazard PMTile list for the current city and reload engine layers. */
+  refreshHazardLayers: () => Promise<void>
 }
 
 export const MapContext = createContext<MapData>({
@@ -66,6 +68,7 @@ export const MapContext = createContext<MapData>({
   clickedZone: null,
   setClickedZone: () => {},
   refreshZoningLayer: async () => {},
+  refreshHazardLayers: async () => {},
 })
 
 export const useMapContext = () => useContext(MapContext)

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, DateTime, ForeignKey, String, func, Index
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
@@ -19,6 +19,7 @@ class HazardArea(Base):
 
     hazard_type = Column(String(100))             # flood, landslide, storm_surge, debris_flow, faultline
     scenario    = Column(String(50), nullable=True)  # 5yr, 25yr, 100yr, ssa1-ssa4; null for faultlines
+    severity    = Column(Integer, nullable=True)  # 1–5 classification for UI color/weight
     pmtile_url  = Column(String(500), nullable=True)
     geometry    = Column(Geometry("GEOMETRY", srid=4326, spatial_index=True), nullable=True)
 

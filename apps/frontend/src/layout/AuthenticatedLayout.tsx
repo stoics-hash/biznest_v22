@@ -141,9 +141,12 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
   )
 }
 
+// Bare outlet — no sidebar, no overflow constraint (scrollable content)
 const FULLSCREEN_PATHS = ['/city-setup']
-const MAP_PATHS = ['/map', '/zoning']
-const FULLSCREEN_MAP_PATHS = ['/zoning/zoning-map']
+// Bare outlet — no sidebar, overflow-hidden so the map canvas fills the viewport
+const FULLSCREEN_MAP_CANVAS_PATHS = ['/hazard', '/zoning']
+const MAP_PATHS            = ['/map']
+const FULLSCREEN_MAP_PATHS: string[] = []
 
 export function AuthenticatedLayout() {
   const { state, signOut } = useAuthContext()
@@ -155,6 +158,17 @@ export function AuthenticatedLayout() {
     return (
       <>
         <Outlet />
+        <MessageWidget />
+      </>
+    )
+  }
+
+  if (FULLSCREEN_MAP_CANVAS_PATHS.some(p => location.pathname.startsWith(p))) {
+    return (
+      <>
+        <div className="h-screen w-full overflow-hidden">
+          <Outlet />
+        </div>
         <MessageWidget />
       </>
     )

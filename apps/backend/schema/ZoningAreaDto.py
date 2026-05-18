@@ -24,6 +24,10 @@ class ZoningAreaCreate(BaseModel):
             examples=["residential", "commercial", "industrial", "agriculture"],
         )
     ]
+    severity: Annotated[
+        int | None,
+        Field(default=None, description="Severity classification 1–5", ge=1, le=5)
+    ]
     geometry: Annotated[
         dict[str,Any] | None,
         Field(
@@ -42,6 +46,10 @@ class ZoningAreaUpdate(BaseModel):
             description="Zone type for this zone",
             examples=["residential", "commercial", "industrial", "agriculture"],
         )
+    ]
+    severity: Annotated[
+        int | None,
+        Field(default=None, description="Severity classification 1–5", ge=1, le=5)
     ]
     geometry: Annotated[
         dict[str, Any] | None,
@@ -79,6 +87,7 @@ class ZoningAreaResponse(BaseModel):
         except ValueError:
             return None
     color_hex: Annotated[str | None, Field(description="Hex color code for this zone, e.g. #RRGGBB")]
+    severity: Annotated[int | None, Field(default=None, description="Severity classification 1–5")]
     geometry: Annotated[
         dict[str, Any] | None,
         Field(

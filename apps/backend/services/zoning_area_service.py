@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from geoalchemy2.shape import from_shape, to_shape
-from shapely.geometry import mapping
+from shapely.geometry import mapping, shape
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from schema.ZoningAreaDto import (
 from models.city import City
 from models.zoning_area import ZoningArea
 from services import geo_processing_service as gps
+from services.coordinate_service import clip_to_city_boundary
 
 
 def get_by_city(city_id: UUID, db: Session) -> list[ZoningArea]:
@@ -34,7 +35,11 @@ def get_or_404(zone_id: UUID, city_id: UUID, db: Session) -> ZoningArea:
 def create(city_id: UUID, payload: ZoningAreaCreate, created_by: UUID, db: Session) -> ZoningArea:
     if not db.query(City).filter(City.id == city_id).first():
         raise HTTPException(status_code=404, detail="City not found")
-    zone = ZoningArea(**payload.model_dump(), created_by=created_by)
+    data = payload.model_dump()
+    if data.get("geometry"):
+        clipped = clip_to_city_boundary(data["geometry"], city_id, db)
+        data["geometry"] = from_shape(shape(clipped), srid=4326)
+    zone = ZoningArea(**data, created_by=created_by)
     db.add(zone)
     db.commit()
     db.refresh(zone)
@@ -43,7 +48,11 @@ def create(city_id: UUID, payload: ZoningAreaCreate, created_by: UUID, db: Sessi
 
 def update(zone_id: UUID, city_id: UUID, payload: ZoningAreaUpdate, db: Session) -> ZoningArea:
     zone = get_or_404(zone_id, city_id, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "geometry" in data and data["geometry"] is not None:
+        clipped = clip_to_city_boundary(data["geometry"], city_id, db)
+        data["geometry"] = from_shape(shape(clipped), srid=4326)
+    for field, value in data.items():
         setattr(zone, field, value)
     db.commit()
     db.refresh(zone)

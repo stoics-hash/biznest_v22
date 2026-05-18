@@ -1,4 +1,4 @@
-import { LayoutGrid, ScanText, Loader2 } from 'lucide-react'
+import { LayoutGrid, Plus, Loader2 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
@@ -30,9 +30,9 @@ export function ZoningPanel() {
           size="sm"
           variant="outline"
           className="h-7 text-xs gap-1.5"
-          onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}
+          onClick={() => void navigate({ to: '/zoning' as never })}
         >
-          <ScanText className="size-3.5" /> OCR + Georeferencing
+          <Plus className="size-3.5" /> Add Zoning Data
         </Button>
       </div>
     </div>

@@ -38,6 +38,22 @@ def create_hazard_area(
     return hazard_area_service.create(city_id, payload, current_user.id, db)
 
 
+@router.post("/{city_id}/hazards/regenerate-pmtiles", response_model=HazardPmtileResponse)
+def regenerate_hazard_pmtiles(
+    city_id: UUID,
+    hazard_type: str = Query(..., description="flood | landslide | storm_surge | debris_flow | faultline"),
+    scenario: str | None = Query(default=None, description="5yr | 25yr | 100yr | ssa1-ssa4 | null for faultlines"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_authenticated_user),
+):
+    """
+    Rebuild the PMTile for a specific city/hazard_type/scenario from current DB geometries
+    and return a fresh 5-hour presigned URL.  Use after POST /{city_id}/hazards to make
+    manually drawn hazard areas visible on the map.
+    """
+    return hazard_area_service.regenerate_city_hazard_pmtile(city_id, hazard_type, scenario, db)
+
+
 @router.get("/{city_id}/hazards/geojson", summary="GeoJSON FeatureCollection for Turf.js")
 def get_hazard_geojson(
     city_id: UUID,
