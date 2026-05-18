@@ -1,7 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { BrandIcon } from "@/config/navigation";
 import { Footer } from "@/components/footer";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 
@@ -12,9 +11,13 @@ export function GuestLayout({ children }: PropsWithChildren) {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link
             to={"/" as never}
-            className="flex items-center gap-2 text-sm font-semibold"
+            className="flex items-center gap-2 text-md font-semibold"
           >
-            <BrandIcon className="size-4" />
+            <img
+              src="/images/logo.png"
+              alt="BizNest logo"
+              className="size-8 shrink-0"
+            />
             BizNest
           </Link>
 
