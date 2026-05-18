@@ -1,5 +1,5 @@
 {
-  "name": "networking",
+  "name": "@networking/api",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
