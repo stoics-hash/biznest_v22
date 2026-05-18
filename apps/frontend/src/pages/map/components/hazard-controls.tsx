@@ -1,7 +1,7 @@
-import { AlertTriangle, LayoutGrid, X, Plus, Upload, PenLine, Plug, ScanText } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, X, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
@@ -9,14 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { HazardPanel } from './hazard-panel'
 import { ZoningPanel } from './zoning-panel'
 
@@ -31,7 +23,6 @@ export function HazardControls() {
   const { hazardLayers, zoningPmtileUrl } = useMapContext()
   const { selectedCity } = useCityContext()
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
-  const navigate = useNavigate()
 
   const hasHazards = hazardLayers.length > 0
   const hasZoning  = !!zoningPmtileUrl || !!selectedCity?.id
@@ -52,47 +43,11 @@ export function HazardControls() {
                 {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
               </CardTitle>
               <div className="flex items-center gap-0.5 -mr-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
-                      <Plus className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" side="bottom" className="w-52">
-                    {activePanel === 'hazard' ? (
-                      <>
-                        <DropdownMenuLabel className="text-xs">Add Hazard Data</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Upload className="size-4" />
-                          Upload file
-                          <span className="ml-auto text-[10px] text-muted-foreground">GeoJSON / ZIP</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => void navigate({ to: '/hazard-draw' as never })}>
-                          <PenLine className="size-4" />
-                          Draw on map
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Plug className="size-4" />
-                          Through API
-                        </DropdownMenuItem>
-                      </>
-                    ) : (
-                      <>
-                        <DropdownMenuLabel className="text-xs">Add Zoning Data</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}>
-                          <ScanText className="size-4" />
-                          OCR + Georeferencing
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning-draw' as never })}>
-                          <PenLine className="size-4" />
-                          Draw on map
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground" asChild>
+                  <Link to={(activePanel === 'hazard' ? '/hazard' : '/zoning') as never}>
+                    <Plus className="size-3.5" />
+                  </Link>
+                </Button>
 
                 <Button
                   variant="ghost"

@@ -7,19 +7,25 @@ import { useCityContext } from '@/context/city.context'
 import type { BoundaryGeometry } from '@/engine/map.engine'
 
 export function MapPage() {
-  const { engine }        = useMapContext()
-  const { cityBoundary }  = useCityContext()
+  const { engine, refreshHazardLayers } = useMapContext()
+  const { cityBoundary }               = useCityContext()
 
-  // Track previous boundary so flyTo only fires when city actually changes,
-  // not on unrelated re-renders.
   const prevBoundaryRef = useRef<BoundaryGeometry | null>(null)
 
+  // flyTo when city boundary first loads or changes
   useEffect(() => {
     if (!engine || !cityBoundary) return
     if (prevBoundaryRef.current === cityBoundary) return
     prevBoundaryRef.current = cityBoundary
     engine.flyToCityBoundary(cityBoundary)
   }, [engine, cityBoundary])
+
+  // Re-fetch hazard tiles every time the map page mounts so data saved on /hazard appears
+  useEffect(() => {
+    if (!engine) return
+    void refreshHazardLayers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine])
 
   return (
     <Map className="size-full">

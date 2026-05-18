@@ -17,27 +17,30 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import {
-  zoningDrawReducer,
-  ZONING_DRAW_INITIAL,
-  type ZoneType,
+  hazardDrawReducer,
+  HAZARD_DRAW_INITIAL,
+  type HazardType,
+  type HazardScenario,
   type DrawMode,
-} from '@/reducer/zoning-draw.reducer'
+} from '@/reducer/hazard-draw.reducer'
 import {
-  zoningUploadReducer,
-  ZONING_UPLOAD_INITIAL,
-} from '@/reducer/zoning-upload.reducer'
+  hazardUploadReducer,
+  HAZARD_UPLOAD_INITIAL,
+} from '@/reducer/hazard-upload.reducer'
 
 const API_URL = import.meta.env.VITE_API_URL as string
 
-const ZONE_TYPES: ZoneType[] = ['residential', 'commercial', 'industrial', 'agriculture']
+const HAZARD_TYPES: HazardType[]     = ['flood', 'landslide', 'storm_surge', 'debris_flow', 'faultline']
+const SCENARIOS:    HazardScenario[] = ['5yr', '25yr', '100yr', 'ssa1', 'ssa2', 'ssa3', 'ssa4']
 
 type ActivePanel = 'draw' | 'upload' | null
 
-const PANEL_BUTTONS: { id: NonNullable<ActivePanel> | 'ocr'; icon: LucideIcon; label: string }[] = [
-  { id: 'draw',   icon: PenLine,  label: 'Draw Zoning Area' },
-  { id: 'upload', icon: Upload,   label: 'Upload GeoJSON' },
-  { id: 'ocr',    icon: ScanText, label: 'OCR + Georeferencing' },
+const PANEL_BUTTONS: { id: NonNullable<ActivePanel>; icon: LucideIcon; label: string }[] = [
+  { id: 'draw',   icon: PenLine, label: 'Draw Hazard Area' },
+  { id: 'upload', icon: Upload,  label: 'Upload GeoJSON' },
 ]
+
+// ── GeoJSON file parser ───────────────────────────────────────────────────────
 
 function extractPolygon(text: string): Polygon | null {
   try {
@@ -73,8 +76,8 @@ const selectCls =
 function DrawPanelContent({
   draw, dispatch, onStartDrawing, onCancelDrawing, onSave,
 }: {
-  draw:            ReturnType<typeof zoningDrawReducer>
-  dispatch:        React.Dispatch<Parameters<typeof zoningDrawReducer>[1]>
+  draw:            ReturnType<typeof hazardDrawReducer>
+  dispatch:        React.Dispatch<Parameters<typeof hazardDrawReducer>[1]>
   onStartDrawing:  () => void
   onCancelDrawing: () => void
   onSave:          () => Promise<void>
@@ -83,11 +86,19 @@ function DrawPanelContent({
   return (
     <div className="flex flex-col gap-3 p-3 overflow-y-auto flex-1">
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Zone Type</label>
-        <select disabled={locked} value={draw.zoneType}
-          onChange={e => dispatch({ type: 'SET_ZONE_TYPE', zoneType: e.target.value as ZoneType })}
+        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hazard Type</label>
+        <select disabled={locked} value={draw.hazardType}
+          onChange={e => dispatch({ type: 'SET_HAZARD_TYPE', hazardType: e.target.value as HazardType })}
           className={selectCls}>
-          {ZONE_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+          {HAZARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+        </select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Scenario</label>
+        <select disabled={locked} value={draw.scenario}
+          onChange={e => dispatch({ type: 'SET_SCENARIO', scenario: e.target.value as HazardScenario })}
+          className={selectCls}>
+          {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -168,8 +179,8 @@ function DrawPanelContent({
 function UploadPanelContent({
   upload, dispatch, onSave,
 }: {
-  upload:   ReturnType<typeof zoningUploadReducer>
-  dispatch: React.Dispatch<Parameters<typeof zoningUploadReducer>[1]>
+  upload:   ReturnType<typeof hazardUploadReducer>
+  dispatch: React.Dispatch<Parameters<typeof hazardUploadReducer>[1]>
   onSave:   () => Promise<void>
 }) {
   const locked = upload.phase === 'saving'
@@ -210,11 +221,19 @@ function UploadPanelContent({
       </div>
       <Separator />
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Zone Type</label>
-        <select disabled={locked} value={upload.zoneType}
-          onChange={e => dispatch({ type: 'SET_ZONE_TYPE', zoneType: e.target.value as ZoneType })}
+        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hazard Type</label>
+        <select disabled={locked} value={upload.hazardType}
+          onChange={e => dispatch({ type: 'SET_HAZARD_TYPE', hazardType: e.target.value as HazardType })}
           className={selectCls}>
-          {ZONE_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+          {HAZARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+        </select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Scenario</label>
+        <select disabled={locked} value={upload.scenario}
+          onChange={e => dispatch({ type: 'SET_SCENARIO', scenario: e.target.value as HazardScenario })}
+          className={selectCls}>
+          {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -255,30 +274,36 @@ function UploadPanelContent({
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export function ZoningPage() {
+export function HazardPage() {
   const navigate = useNavigate()
 
+  // Read outer context for visual prefs only — NOT used to register with MapProvider
   const outerCtx = useMapContext()
   const { selectedCity, cityId, cityBoundary } = useCityContext()
 
+  // Local engine state — isolated from the outer MapProvider
   const [engine, setLocalEngine] = useState<MapEngine | null>(null)
+  const engineRef = useRef<MapEngine | null>(null)
 
   function handleSetEngine(eng: MapEngine | null) {
+    engineRef.current = eng
     setLocalEngine(eng)
   }
 
-  const [drawState,   dispatchDraw]   = useReducer(zoningDrawReducer,   ZONING_DRAW_INITIAL)
-  const [uploadState, dispatchUpload] = useReducer(zoningUploadReducer, ZONING_UPLOAD_INITIAL)
+  const [drawState,   dispatchDraw]   = useReducer(hazardDrawReducer,   HAZARD_DRAW_INITIAL)
+  const [uploadState, dispatchUpload] = useReducer(hazardUploadReducer, HAZARD_UPLOAD_INITIAL)
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
 
   const draw = useDrawPolygon(engine)
 
+  // ── City boundary ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!engine || !cityBoundary) return
     engine.flyToCityBoundary(cityBoundary)
     engine.setCityBoundary(cityBoundary)
   }, [engine, cityBoundary])
 
+  // ── Bridge: drawn shape → reducer ─────────────────────────────────────────
   const phaseRef = useRef(drawState.phase)
   phaseRef.current = drawState.phase
 
@@ -297,22 +322,18 @@ export function ZoningPage() {
   function handleStartDrawing()  { dispatchDraw({ type: 'START_DRAWING' }); void draw.activate(drawState.drawMode) }
   function handleCancelDrawing() { dispatchDraw({ type: 'CANCEL_DRAWING' }); draw.deactivate() }
 
-  async function saveAndRefresh(body: Record<string, unknown>) {
-    if (!cityId) return
-    const res = await fetch(`${API_URL}/cities/${cityId}/zoning`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) { const d = await res.json().catch(() => ({})) as { detail?: string }; throw new Error(d.detail ?? `HTTP ${res.status}`) }
-    await fetch(`${API_URL}/cities/${cityId}/zoning/regenerate-pmtiles`, { method: 'POST', credentials: 'include' })
-  }
-
   async function handleDrawSave() {
     if (!drawState.geometry || !cityId) return
     dispatchDraw({ type: 'SAVE_START' })
     try {
-      await saveAndRefresh({ city_id: cityId, zone_type: drawState.zoneType, severity: drawState.severity, geometry: drawState.geometry })
+      const res = await fetch(`${API_URL}/cities/${cityId}/hazards`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hazard_type: drawState.hazardType, scenario: drawState.scenario, severity: drawState.severity, geometry: drawState.geometry }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})) as { detail?: string }; throw new Error(d.detail ?? `HTTP ${res.status}`) }
+      const params = new URLSearchParams({ hazard_type: drawState.hazardType, scenario: drawState.scenario })
+      await fetch(`${API_URL}/cities/${cityId}/hazards/regenerate-pmtiles?${params}`, { method: 'POST', credentials: 'include' })
       dispatchDraw({ type: 'SAVE_SUCCESS' })
       draw.clearDrawn()
     } catch (err) {
@@ -324,17 +345,26 @@ export function ZoningPage() {
     if (!uploadState.geometry || !cityId) return
     dispatchUpload({ type: 'SAVE_START' })
     try {
-      await saveAndRefresh({ city_id: cityId, zone_type: uploadState.zoneType, severity: uploadState.severity, geometry: uploadState.geometry })
+      const res = await fetch(`${API_URL}/cities/${cityId}/hazards`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hazard_type: uploadState.hazardType, scenario: uploadState.scenario, severity: uploadState.severity, geometry: uploadState.geometry }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})) as { detail?: string }; throw new Error(d.detail ?? `HTTP ${res.status}`) }
+      const params = new URLSearchParams({ hazard_type: uploadState.hazardType, scenario: uploadState.scenario })
+      await fetch(`${API_URL}/cities/${cityId}/hazards/regenerate-pmtiles?${params}`, { method: 'POST', credentials: 'include' })
       dispatchUpload({ type: 'SAVE_SUCCESS' })
     } catch (err) {
       dispatchUpload({ type: 'SAVE_ERROR', errorMsg: err instanceof Error ? err.message : 'Save failed' })
     }
   }
 
+  // Local MapContext — intercepts setEngine so the outer MapProvider stays clean
   const localCtx = {
     ...outerCtx,
     engine,
     setEngine: handleSetEngine,
+    // Stub everything that would trigger MapProvider side-effects
     hazardLayers:        [] as typeof outerCtx.hazardLayers,
     visibleHazardKeys:   new Set<string>(),
     toggleHazard:        () => {},
@@ -352,8 +382,11 @@ export function ZoningPage() {
   }
 
   return (
+    // MapContext.Provider intercepts setEngine — the Map component works normally
+    // without polluting the outer MapProvider.
     <MapContext.Provider value={localCtx}>
       <div className="relative size-full">
+        {/* Map fills the container via size-full (same as the main /map page) */}
         <Map className="size-full" center={[122.0, 12.0]} zoom={6} pitch={0} />
 
         {/* Back button */}
@@ -374,7 +407,7 @@ export function ZoningPage() {
               <CardHeader className="pb-0 pt-3 px-3 shrink-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xs font-semibold">
-                    {activePanel === 'draw' ? 'Draw Zoning Area' : 'Upload GeoJSON'}
+                    {activePanel === 'draw' ? 'Draw Hazard Area' : 'Upload GeoJSON'}
                   </CardTitle>
                   <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground"
                     onClick={() => handleTogglePanel(activePanel)}>
@@ -397,32 +430,39 @@ export function ZoningPage() {
           <TooltipProvider delayDuration={400}>
             <div className="pointer-events-auto self-center flex flex-col gap-0.5 rounded-xl bg-black/65 backdrop-blur-md shadow-2xl p-1.5 border border-white/10">
               {PANEL_BUTTONS.map((btn, i) => {
-                const Icon     = btn.icon
-                const isOcr    = btn.id === 'ocr'
-                const isActive = !isOcr && activePanel === btn.id
+                const Icon = btn.icon
+                const isActive = activePanel === btn.id
                 return (
                   <div key={btn.id}>
                     {i > 0 && <Separator className="my-0.5 bg-white/10" />}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" aria-label={btn.label}
-                          disabled={isOcr}
-                          onClick={() => !isOcr && handleTogglePanel(btn.id as ActivePanel)}
+                          onClick={() => handleTogglePanel(btn.id)}
                           className={cn(
                             'size-9 rounded-lg transition-all hover:bg-white/15 text-white/60 hover:text-white',
-                            isOcr   && 'text-white/30 disabled:pointer-events-auto cursor-not-allowed',
                             isActive && 'bg-white/20 text-white ring-1 ring-white/30',
                           )}>
                           <Icon className="size-5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="left" sideOffset={8}>
-                        {isOcr ? 'OCR + Georeferencing — coming soon' : btn.label}
-                      </TooltipContent>
+                      <TooltipContent side="left" sideOffset={8}>{btn.label}</TooltipContent>
                     </Tooltip>
                   </div>
                 )
               })}
+              <div>
+                <Separator className="my-0.5 bg-white/10" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled aria-label="OCR + Georeferencing"
+                      className="size-9 rounded-lg text-white/30 disabled:pointer-events-auto cursor-not-allowed">
+                      <ScanText className="size-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" sideOffset={8}>OCR + Georeferencing — coming soon</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
           </TooltipProvider>
         </div>

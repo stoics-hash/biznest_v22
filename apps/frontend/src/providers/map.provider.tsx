@@ -241,10 +241,9 @@ export function MapProvider({ children }: PropsWithChildren) {
       const res   = await listHazardPmtilesCitiesCityIdHazardsPmtilesGet(selectedCity.id)
       const tiles = await enrichWithSourceLayers(res.data as HazardTile[])
       setHazardLayersState(tiles)
-      // Keep current visible keys — only add newly appeared keys as hidden
-      // so the user must explicitly enable the new layer.
     } catch { /* city has no hazard data */ }
   }, [selectedCity?.id])
+
 
   return (
     <MapContext.Provider value={{

@@ -75,6 +75,7 @@ export class MapEngine {
   private _boundaryMouseHandler: ((e: maplibregl.MapMouseEvent) => void) | null = null
   private readonly _hazardKeys = new Set<string>()
   private readonly _imageOverlayIds = new Set<string>()
+  private _destroyed = false
   private _zoneClickListeners: {
     click: (e: maplibregl.MapLayerMouseEvent) => void
     enter: () => void
@@ -323,6 +324,7 @@ export class MapEngine {
    * Fly the map to fit the city boundary with padding.
    */
   flyToCityBoundary(boundary: BoundaryGeometry): this {
+    if (this._destroyed) return this
     if (!this._map.isStyleLoaded()) {
       this._map.once('idle', () => this.flyToCityBoundary(boundary))
       return this
@@ -340,6 +342,7 @@ export class MapEngine {
    * Also restricts `isInsideBoundary` checks to this geometry.
    */
   setCityBoundary(boundary: BoundaryGeometry): this {
+    if (this._destroyed) return this
     if (!this._map.isStyleLoaded()) {
       this._map.once('idle', () => this.setCityBoundary(boundary))
       return this
@@ -650,6 +653,7 @@ export class MapEngine {
   // ── Cleanup ──────────────────────────────────────────────────────────────────
 
   destroy(): void {
+    this._destroyed = true
     this.teardownZoneClickHandler()
     this.clearMarkers()
     this.clearPopups()

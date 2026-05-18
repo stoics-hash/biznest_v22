@@ -40,7 +40,6 @@ ROLES = {
         "zoning:read",
         "hazard:read",
         "establishment:read",
-        "alert:read",
         "analytics:view",
         "location:save",
         "view:map",
