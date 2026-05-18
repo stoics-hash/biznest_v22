@@ -1,5 +1,6 @@
 import { MapPin, Sparkles, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { H2, H3, Small, Muted, Lead } from "@/components/ui/typography";
 
 const steps = [
   {
@@ -40,16 +41,16 @@ export function StepsSection() {
       <div className="mx-auto w-full max-w-6xl px-6 md:px-10">
         {/* Heading */}
         <div className="mx-auto mb-14 max-w-4xl text-center md:mb-16">
-          <p className="mb-3 text-sm font-medium uppercase tracking-widest text-muted-foreground">
+          <Small className="mb-3 inline-block uppercase tracking-widest text-muted-foreground">
             Your Roadmap
-          </p>
-          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
+          </Small>
+          <H2 className="border-0 pb-0">
             Go from business idea to the right location in 3 smart steps
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
+          </H2>
+          <Lead className="mx-auto mt-4 max-w-2xl">
             BizNest helps you decide, validate, and connect, so your next move
             is guided by data instead of guesswork.
-          </p>
+          </Lead>
         </div>
 
         {/* Step Cards */}
@@ -74,14 +75,10 @@ export function StepsSection() {
                   </span>
                 </div>
 
-                <h3 className="mb-3 text-xl font-semibold leading-tight md:text-2xl">
-                  {item.title}
-                </h3>
+                <H3 className="mb-3">{item.title}</H3>
 
-                <p className="mb-3 text-sm leading-relaxed text-muted-foreground md:text-base">
-                  {item.description}
-                </p>
-                <p className="text-sm text-primary/90">{item.hint}</p>
+                <Muted className="mb-3 md:text-base">{item.description}</Muted>
+                <Small className="text-primary/90">{item.hint}</Small>
               </div>
             );
           })}

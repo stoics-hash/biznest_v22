@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { H1, Small, Lead } from "@/components/ui/typography";
 
 const benefits = [
   "AI-driven location insights tailored to your industry",
@@ -13,21 +14,21 @@ export function HeroSection() {
       <div className="mx-auto w-full max-w-6xl px-6 md:px-10">
         <div className="mx-auto max-w-3xl">
           {/* Badge */}
-          <div className="mb-4 inline-block rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+          <Small className="mb-4 inline-block rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-primary">
             For Growth-Minded Founders
-          </div>
+          </Small>
 
           {/* Heading */}
-          <h1 className="mb-3 text-4xl font-bold tracking-tight md:text-5xl">
+          <H1 className="mb-3">
             Smart <span className="text-primary">Locations.</span> Stronger{" "}
             <span className="text-primary">Connections.</span> Powered by AI.
-          </h1>
+          </H1>
 
           {/* Subheading */}
-          <p className="mb-6 max-w-xl text-lg text-muted-foreground md:text-xl">
+          <Lead className="mb-6 max-w-xl">
             An AI-powered system that helps choose business locations and
             connects local businesses in your city.
-          </p>
+          </Lead>
 
           {/* CTA Buttons */}
           <div className="mb-8 flex gap-3">

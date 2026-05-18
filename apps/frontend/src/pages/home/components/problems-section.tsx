@@ -1,4 +1,5 @@
 import { Check, X } from "lucide-react";
+import { H2, H3, Muted } from "@/components/ui/typography";
 
 const problems = [
   {
@@ -51,16 +52,13 @@ function ProblemCard({
         </div>
       </div>
 
-      <h3 className="mb-4 text-xl font-semibold md:text-2xl">{title}</h3>
+      <H3 className="mb-4">{title}</H3>
 
       <ul className="space-y-3">
         {points.map((point, i) => (
-          <li
-            key={i}
-            className="flex gap-3 text-sm text-muted-foreground md:text-base"
-          >
+          <li key={i} className="flex gap-3">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
-            <span>{point}</span>
+            <Muted className="md:text-base">{point}</Muted>
           </li>
         ))}
       </ul>
@@ -74,10 +72,10 @@ export function ProblemsSection() {
       <div className="mx-auto w-full max-w-6xl px-6 md:px-10">
         {/* Heading */}
         <div className="mx-auto mb-14 max-w-4xl text-center md:mb-16">
-          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
+          <H2 className="border-0 pb-0">
             Finding a profitable location is usually a guessing game.{" "}
             <span className="text-primary">We turned it into a science.</span>
-          </h2>
+          </H2>
         </div>
 
         {/* Cards Grid */}
