@@ -19,10 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { HazardPanel } from './hazard-panel'
 import { ZoningPanel } from './zoning-panel'
-import { DrawPanel } from './draw-panel'
 
 type ActivePanel = 'hazard' | 'zoning' | null
-type DrawMode    = 'hazard' | 'zoning' | null
 
 const STRIP_BUTTONS: { id: NonNullable<ActivePanel>; icon: LucideIcon; label: string }[] = [
   { id: 'hazard', icon: AlertTriangle, label: 'Hazard Layers' },
@@ -33,16 +31,10 @@ export function HazardControls() {
   const { hazardLayers, zoningPmtileUrl } = useMapContext()
   const { selectedCity } = useCityContext()
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
-  const [drawMode,    setDrawMode]    = useState<DrawMode>(null)
   const navigate = useNavigate()
 
   const hasHazards = hazardLayers.length > 0
   const hasZoning  = !!zoningPmtileUrl || !!selectedCity?.id
-
-  function togglePanel(panel: ActivePanel) {
-    setDrawMode(null)
-    setActivePanel(prev => (prev === panel ? null : panel))
-  }
 
   const disabled: Record<NonNullable<ActivePanel>, boolean> = {
     hazard: !hasHazards,
@@ -54,84 +46,70 @@ export function HazardControls() {
 
       {activePanel && (
         <Card className="pointer-events-auto flex flex-col w-60 h-full shadow-2xl bg-background/95 backdrop-blur-md border-border/50 animate-in fade-in-0 slide-in-from-right-2 duration-150">
-          {/* Header — hidden when DrawPanel is active (DrawPanel has its own back-arrow header) */}
-          {!drawMode && (
-            <>
-              <CardHeader className="pb-0 pt-3 px-3 shrink-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold">
-                    {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
-                  </CardTitle>
-                  <div className="flex items-center gap-0.5 -mr-1">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
-                          <Plus className="size-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" side="bottom" className="w-52">
-                        {activePanel === 'hazard' ? (
-                          <>
-                            <DropdownMenuLabel className="text-xs">Add Hazard Data</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Upload className="size-4" />
-                              Upload file
-                              <span className="ml-auto text-[10px] text-muted-foreground">GeoJSON / ZIP</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDrawMode('hazard')}>
-                              <PenLine className="size-4" />
-                              Draw on map
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Plug className="size-4" />
-                              Through API
-                            </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <>
-                            <DropdownMenuLabel className="text-xs">Add Zoning Data</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}>
-                              <ScanText className="size-4" />
-                              OCR + Georeferencing
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDrawMode('zoning')}>
-                              <PenLine className="size-4" />
-                              Draw on map
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-6 text-muted-foreground hover:text-foreground"
-                      onClick={() => setActivePanel(null)}
-                    >
-                      <X className="size-3.5" />
+          <CardHeader className="pb-0 pt-3 px-3 shrink-0">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">
+                {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
+              </CardTitle>
+              <div className="flex items-center gap-0.5 -mr-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
+                      <Plus className="size-3.5" />
                     </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <Separator className="mt-2 shrink-0" />
-            </>
-          )}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" side="bottom" className="w-52">
+                    {activePanel === 'hazard' ? (
+                      <>
+                        <DropdownMenuLabel className="text-xs">Add Hazard Data</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Upload className="size-4" />
+                          Upload file
+                          <span className="ml-auto text-[10px] text-muted-foreground">GeoJSON / ZIP</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void navigate({ to: '/hazard-draw' as never })}>
+                          <PenLine className="size-4" />
+                          Draw on map
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Plug className="size-4" />
+                          Through API
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuLabel className="text-xs">Add Zoning Data</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}>
+                          <ScanText className="size-4" />
+                          OCR + Georeferencing
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning-draw' as never })}>
+                          <PenLine className="size-4" />
+                          Draw on map
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => setActivePanel(null)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <Separator className="mt-2 shrink-0" />
 
           <CardContent className="flex flex-col flex-1 min-h-0 p-0">
-            {drawMode ? (
-              <DrawPanel
-                variant={drawMode}
-                onBack={() => setDrawMode(null)}
-                onSaved={() => setDrawMode(null)}
-              />
-            ) : activePanel === 'hazard' ? (
-              <HazardPanel />
-            ) : (
-              <ZoningPanel />
-            )}
+            {activePanel === 'hazard' ? <HazardPanel /> : <ZoningPanel />}
           </CardContent>
         </Card>
       )}
@@ -140,7 +118,7 @@ export function HazardControls() {
         <div className="pointer-events-auto self-center flex flex-col gap-0.5 rounded-xl bg-black/65 backdrop-blur-md shadow-2xl p-1.5 border border-white/10">
           {STRIP_BUTTONS.map((btn, i) => {
             const Icon = btn.icon
-            const isActive = activePanel === btn.id
+            const isActive   = activePanel === btn.id
             const isDisabled = disabled[btn.id]
             return (
               <div key={btn.id}>
@@ -152,7 +130,7 @@ export function HazardControls() {
                       size="icon"
                       aria-label={btn.label}
                       disabled={isDisabled}
-                      onClick={() => togglePanel(btn.id)}
+                      onClick={() => setActivePanel(prev => prev === btn.id ? null : btn.id)}
                       className={cn(
                         'size-9 rounded-lg transition-all',
                         'hover:bg-white/15 text-white/60 hover:text-white',

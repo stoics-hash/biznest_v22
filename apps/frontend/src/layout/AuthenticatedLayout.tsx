@@ -141,7 +141,7 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
   )
 }
 
-const FULLSCREEN_PATHS = ['/city-setup']
+const FULLSCREEN_PATHS = ['/city-setup', '/hazard-draw', '/zoning-draw']
 const MAP_PATHS = ['/map', '/zoning']
 const FULLSCREEN_MAP_PATHS = ['/zoning/zoning-map']
 
