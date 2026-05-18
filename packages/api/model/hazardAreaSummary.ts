@@ -13,6 +13,7 @@ export interface HazardAreaSummary {
   city_id: string;
   hazard_type: string | null;
   scenario: string | null;
+  severity: number | null;
   pmtile_url: string | null;
   created_by: string | null;
   created_at: string;

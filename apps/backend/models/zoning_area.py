@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, DateTime, ForeignKey, String, func, Index
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
@@ -18,7 +18,8 @@ class ZoningArea(Base):
 
     zone_type = Column(String(100))
     color_hex = Column(String(7), nullable=True)   # "#RRGGBB" from K-means cluster centre
-    geometry = Column(Geometry("GEOMETRY", srid=4326, spatial_index=True), nullable=True)
+    severity  = Column(Integer, nullable=True)     # 1–5 classification for UI color/weight
+    geometry  = Column(Geometry("GEOMETRY", srid=4326, spatial_index=True), nullable=True)
     pmtile_url = Column(String(500), nullable=True)  # MinIO object key for city-level zoning PMTile
 
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

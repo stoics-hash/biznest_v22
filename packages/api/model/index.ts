@@ -57,6 +57,7 @@ export * from './permissionResponse';
 export * from './presignedUrlResponse';
 export * from './provinceResponse';
 export * from './refreshRequest';
+export * from './regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams';
 export * from './regionResponse';
 export * from './registerRequest';
 export * from './registerRequestRoleName';

@@ -9,5 +9,6 @@ import type { HazardAreaCreateGeometry } from './hazardAreaCreateGeometry';
 export interface HazardAreaCreate {
   hazard_type?: string | null;
   scenario?: string | null;
+  severity?: number | null;
   geometry?: HazardAreaCreateGeometry;
 }

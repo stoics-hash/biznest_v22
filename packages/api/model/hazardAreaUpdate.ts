@@ -8,5 +8,6 @@ import type { HazardAreaUpdateGeometry } from './hazardAreaUpdateGeometry';
 
 export interface HazardAreaUpdate {
   hazard_type?: string | null;
+  severity?: number | null;
   geometry?: HazardAreaUpdateGeometry;
 }

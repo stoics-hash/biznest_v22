@@ -12,6 +12,8 @@ export interface ZoningAreaCreate {
   city_id: string;
   /** Zone type for this zone */
   zone_type?: ZoneType | null;
+  /** Severity classification 1–5 */
+  severity?: number | null;
   /** Zone geometry for this zone */
   geometry?: ZoningAreaCreateGeometry;
 }

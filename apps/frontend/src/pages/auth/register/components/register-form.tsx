@@ -50,7 +50,7 @@ export function RegisterForm({
           <Input
             id="email"
             type="email"
-            placeholder="you@example.com"
+            placeholder="juandelacruz@gmail.com"
             autoComplete="email"
             required
             value={email}

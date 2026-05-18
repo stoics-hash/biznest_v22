@@ -26,7 +26,8 @@ from sklearn.cluster import KMeans
 
 from core.minio_client import minio_client, BUCKET_NAME
 
-_ZONING_PMTILE_PREFIX = "pmtiles/zoning"
+_ZONING_PMTILE_PREFIX  = "pmtiles/zoning"
+_HAZARD_PMTILE_PREFIX  = "pmtiles/hazards"
 _PMTILE_PRESIGN_HOURS = 5
 _WHITE_THRESHOLD = 230
 _BLACK_THRESHOLD = 30
@@ -473,23 +474,19 @@ def _run_tippecanoe(geojson_path: str, pmtile_path: str) -> bool:
         return False  # wsl.exe not on PATH or WSL not installed
 
 
-def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
+def _upload_pmtile(geojson: dict, object_key: str) -> str | None:
     """
-    Write GeoJSON → run tippecanoe (native or via WSL) → upload PMTile to MinIO.
-    Returns the MinIO object key or None when tippecanoe unavailable.
-    The object key is stable and can be persisted in the DB.
-    Use presign_pmtile() to get a time-limited download URL.
-    Overwrites any existing zoning PMTile for this city.
+    Shared core: GeoJSON → tippecanoe → MinIO upload.
+    Returns object_key on success, None if tippecanoe unavailable.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        geojson_path = Path(tmpdir) / "zones.geojson"
-        pmtile_path = Path(tmpdir) / "zones.pmtiles"
+        geojson_path = Path(tmpdir) / "data.geojson"
+        pmtile_path  = Path(tmpdir) / "data.pmtiles"
         geojson_path.write_text(json.dumps(geojson), encoding="utf-8")
 
         if not _run_tippecanoe(str(geojson_path), str(pmtile_path)):
             return None
 
-        object_key = f"{_ZONING_PMTILE_PREFIX}/city-{city_id}.pmtiles"
         pmtile_bytes = pmtile_path.read_bytes()
         minio_client.put_object(
             BUCKET_NAME,
@@ -498,8 +495,35 @@ def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
             length=len(pmtile_bytes),
             content_type="application/octet-stream",
         )
-
     return object_key
+
+
+def generate_pmtiles(geojson: dict, city_id: UUID) -> str | None:
+    """
+    Write GeoJSON → run tippecanoe (native or via WSL) → upload PMTile to MinIO.
+    Returns the MinIO object key or None when tippecanoe unavailable.
+    The object key is stable and can be persisted in the DB.
+    Use presign_pmtile() to get a time-limited download URL.
+    Overwrites any existing zoning PMTile for this city.
+    """
+    object_key = f"{_ZONING_PMTILE_PREFIX}/city-{city_id}.pmtiles"
+    return _upload_pmtile(geojson, object_key)
+
+
+def generate_hazard_pmtiles(
+    geojson: dict,
+    city_id: UUID,
+    hazard_type: str,
+    scenario: str | None,
+) -> str | None:
+    """
+    Build a hazard PMTile for a specific city/hazard_type/scenario combination.
+    Used for manually drawn hazard areas (city-scoped, distinct from seeded province tiles).
+    Returns the MinIO object key or None if tippecanoe is unavailable.
+    """
+    scenario_slug = scenario or "all"
+    object_key = f"{_HAZARD_PMTILE_PREFIX}/{hazard_type}/{scenario_slug}/city-{city_id}.pmtiles"
+    return _upload_pmtile(geojson, object_key)
 
 
 def presign_pmtile(object_key: str) -> str:

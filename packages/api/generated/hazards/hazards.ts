@@ -32,7 +32,8 @@ import type {
   HazardAreaSummary,
   HazardAreaUpdate,
   HazardPmtileResponse,
-  ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams
+  ListHazardPmtilesCitiesCityIdHazardsPmtilesGetParams,
+  RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams
 } from '../../model';
 
 
@@ -241,6 +242,71 @@ export const useCreateHazardAreaCitiesCityIdHazardsPost = <TError = AxiosError<H
         TContext
       > => {
       return useMutation(getCreateHazardAreaCitiesCityIdHazardsPostMutationOptions(options));
+    }
+    /**
+ * Rebuild the PMTile for a specific city/hazard_type/scenario from current DB geometries
+and return a fresh 5-hour presigned URL.  Use after POST /{city_id}/hazards to make
+manually drawn hazard areas visible on the map.
+ * @summary Regenerate Hazard Pmtiles
+ */
+export const regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost = (
+    cityId: string,
+    params: RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams, options?: AxiosRequestConfig
+ ): Promise<AxiosResponse<HazardPmtileResponse>> => {
+
+
+    return axios.default.post(
+      `/cities/${cityId}/hazards/regenerate-pmtiles`,undefined,{
+    ...options,
+        params: {...params, ...options?.params},}
+    );
+  }
+
+
+
+export const getRegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostMutationOptions = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost>>, TError,{cityId: string;params: RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams}, TContext>, axios?: AxiosRequestConfig}
+): UseMutationOptions<Awaited<ReturnType<typeof regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost>>, TError,{cityId: string;params: RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams}, TContext> => {
+
+const mutationKey = ['regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost'];
+const {mutation: mutationOptions, axios: axiosOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, axios: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost>>, {cityId: string;params: RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams}> = (props) => {
+          const {cityId,params} = props ?? {};
+
+          return  regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost(cityId,params,axiosOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostMutationResult = NonNullable<Awaited<ReturnType<typeof regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost>>>
+
+    export type RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostMutationError = AxiosError<HTTPValidationError>
+
+    /**
+ * @summary Regenerate Hazard Pmtiles
+ */
+export const useRegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost = <TError = AxiosError<HTTPValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost>>, TError,{cityId: string;params: RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams}, TContext>, axios?: AxiosRequestConfig}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof regenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPost>>,
+        TError,
+        {cityId: string;params: RegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostParams},
+        TContext
+      > => {
+      return useMutation(getRegenerateHazardPmtilesCitiesCityIdHazardsRegeneratePmtilesPostMutationOptions(options));
     }
     /**
  * @summary GeoJSON FeatureCollection for Turf.js

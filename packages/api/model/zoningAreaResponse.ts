@@ -16,6 +16,8 @@ export interface ZoningAreaResponse {
   zone_type?: ZoneType | null;
   /** Hex color code for this zone, e.g. #RRGGBB */
   color_hex: string | null;
+  /** Severity classification 1–5 */
+  severity?: number | null;
   /** Zone geometry for this zone */
   geometry?: ZoningAreaResponseGeometry;
   /** Presigned MinIO URL for city-level zoning PMTile, if available */

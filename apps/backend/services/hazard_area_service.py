@@ -3,12 +3,16 @@ from datetime import timedelta
 from uuid import UUID
 
 from fastapi import HTTPException
+from geoalchemy2.shape import from_shape, to_shape
+from shapely.geometry import mapping, shape
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.minio_client import BUCKET_NAME, minio_client
 from schema.HazardAreaDto import HazardAreaCreate, HazardAreaUpdate, HazardPmtileResponse
 from models.hazard_area import HazardArea
+from services.coordinate_service import clip_to_city_boundary
+from services import geo_processing_service as gps
 
 _PMTILE_URL_TTL = timedelta(hours=5)
 
@@ -54,10 +58,14 @@ def get_or_404(hazard_id: UUID, city_id: UUID, db: Session) -> HazardArea:
 
 
 def create(city_id: UUID, payload: HazardAreaCreate, created_by: UUID, db: Session) -> HazardArea:
+    data = payload.model_dump()
+    if data.get("geometry"):
+        clipped = clip_to_city_boundary(data["geometry"], city_id, db)
+        data["geometry"] = from_shape(shape(clipped), srid=4326)
     hazard = HazardArea(
         city_id=city_id,
         created_by=created_by,
-        **payload.model_dump(),
+        **data,
     )
     db.add(hazard)
     db.commit()
@@ -67,7 +75,11 @@ def create(city_id: UUID, payload: HazardAreaCreate, created_by: UUID, db: Sessi
 
 def update(hazard_id: UUID, city_id: UUID, payload: HazardAreaUpdate, db: Session) -> HazardArea:
     hazard = get_or_404(hazard_id, city_id, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "geometry" in data and data["geometry"] is not None:
+        clipped = clip_to_city_boundary(data["geometry"], city_id, db)
+        data["geometry"] = from_shape(shape(clipped), srid=4326)
+    for field, value in data.items():
         setattr(hazard, field, value)
     db.commit()
     db.refresh(hazard)
@@ -78,6 +90,79 @@ def delete(hazard_id: UUID, city_id: UUID, db: Session) -> None:
     hazard = get_or_404(hazard_id, city_id, db)
     db.delete(hazard)
     db.commit()
+
+
+def regenerate_city_hazard_pmtile(
+    city_id: UUID,
+    hazard_type: str,
+    scenario: str | None,
+    db: Session,
+) -> HazardPmtileResponse:
+    """
+    Rebuild the PMTile for a specific city/hazard_type/scenario from current DB geometries.
+    Designed for manually drawn hazard areas — seeded province-level tiles are not affected.
+    Raises 404 when no geometry exists for that combination.
+    """
+    areas = (
+        db.query(HazardArea)
+        .filter(
+            HazardArea.city_id == city_id,
+            HazardArea.hazard_type == hazard_type,
+            HazardArea.scenario == scenario,
+            HazardArea.geometry.isnot(None),
+        )
+        .all()
+    )
+    if not areas:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No {hazard_type} ({scenario or 'all'}) geometry found for this city.",
+        )
+
+    features = []
+    for area in areas:
+        try:
+            features.append({
+                "type": "Feature",
+                "properties": {
+                    "id":          str(area.id),
+                    "hazard_type": area.hazard_type,
+                    "scenario":    area.scenario,
+                    "severity":    area.severity,
+                },
+                "geometry": mapping(to_shape(area.geometry)),
+            })
+        except Exception:
+            continue
+
+    if not features:
+        raise HTTPException(status_code=422, detail="No valid geometries to tile.")
+
+    object_key = gps.generate_hazard_pmtiles(
+        {"type": "FeatureCollection", "features": features},
+        city_id,
+        hazard_type,
+        scenario,
+    )
+    if not object_key:
+        raise HTTPException(
+            status_code=422,
+            detail="PMTile generation failed — tippecanoe not available on this host.",
+        )
+
+    # Persist the new object key on all matching hazard areas for this city/type/scenario
+    db.query(HazardArea).filter(
+        HazardArea.city_id == city_id,
+        HazardArea.hazard_type == hazard_type,
+        HazardArea.scenario == scenario,
+    ).update({"pmtile_url": object_key}, synchronize_session="fetch")
+    db.commit()
+
+    return HazardPmtileResponse(
+        hazard_type=hazard_type,
+        scenario=scenario,
+        pmtile_url=gps.presign_pmtile(object_key),
+    )
 
 
 def get_geojson(

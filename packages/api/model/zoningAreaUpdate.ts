@@ -10,6 +10,8 @@ import type { ZoningAreaUpdateGeometry } from './zoningAreaUpdateGeometry';
 export interface ZoningAreaUpdate {
   /** Zone type for this zone */
   zone_type?: ZoneType | null;
+  /** Severity classification 1–5 */
+  severity?: number | null;
   /** Zone geometry for this zone */
   geometry?: ZoningAreaUpdateGeometry;
 }
