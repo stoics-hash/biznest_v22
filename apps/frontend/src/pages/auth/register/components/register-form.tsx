@@ -1,21 +1,22 @@
-import type { Dispatch, FormEvent, SetStateAction } from 'react'
-import { Link } from '@tanstack/react-router'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Spinner } from '@/components/ui/spinner'
+import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { Link } from "@tanstack/react-router";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/pages/auth/components/password-input";
 
 interface RegisterFormProps {
-  email: string
-  setEmail: Dispatch<SetStateAction<string>>
-  fullName: string
-  setFullName: Dispatch<SetStateAction<string>>
-  password: string
-  setPassword: Dispatch<SetStateAction<string>>
-  error: string | null
-  loading: boolean
-  onSubmit: (e: FormEvent) => Promise<void>
+  email: string;
+  setEmail: Dispatch<SetStateAction<string>>;
+  fullName: string;
+  setFullName: Dispatch<SetStateAction<string>>;
+  password: string;
+  setPassword: Dispatch<SetStateAction<string>>;
+  error: string | null;
+  loading: boolean;
+  onSubmit: (e: FormEvent) => Promise<void>;
 }
 
 export function RegisterForm({
@@ -32,7 +33,9 @@ export function RegisterForm({
   return (
     <div className="w-full max-w-sm">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Create an account
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Fill in your details to get started.
         </p>
@@ -54,7 +57,7 @@ export function RegisterForm({
             autoComplete="email"
             required
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </div>
 
@@ -69,23 +72,20 @@ export function RegisterForm({
             minLength={2}
             maxLength={100}
             value={fullName}
-            onChange={e => setFullName(e.target.value)}
+            onChange={(e) => setFullName(e.target.value)}
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            autoComplete="new-password"
-            required
-            minLength={6}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
-        </div>
+        <PasswordInput
+          id="password"
+          label="Password"
+          placeholder="••••••••"
+          autoComplete="new-password"
+          required
+          minLength={6}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
         <Button type="submit" className="mt-2 w-full" disabled={loading}>
           {loading && <Spinner className="mr-2 size-4" />}
@@ -94,7 +94,7 @@ export function RegisterForm({
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        Already have an account?{' '}
+        Already have an account?{" "}
         <Link
           to="/login"
           className="font-medium text-foreground underline underline-offset-4 hover:no-underline"
@@ -103,5 +103,5 @@ export function RegisterForm({
         </Link>
       </p>
     </div>
-  )
+  );
 }
