@@ -1,3 +1,7 @@
-export default function App() {
-  return null
+import type { PropsWithChildren } from "react";
+
+function App({ children }: PropsWithChildren) {
+  return children;
 }
+
+export default App;
