@@ -23,7 +23,7 @@ export function CityProvider({ children }: PropsWithChildren) {
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: cityBoundary = null } = useQuery({
+  const { data: cityBoundary = null, isLoading: isBoundaryLoading } = useQuery({
     queryKey: ['/cities/', cityId, 'geometry'],
     queryFn: () =>
       axios.get<CityGeometryResponse>(`/cities/${cityId}/geometry`).then(r => r.data.boundary),
@@ -37,6 +37,7 @@ export function CityProvider({ children }: PropsWithChildren) {
     selectedCity,
     cityId,
     cityBoundary,
+    isBoundaryLoading: !!cityId && isBoundaryLoading,
     clearCity,
     selectCity: authSelectCity,
   }

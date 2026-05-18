@@ -1,7 +1,7 @@
-import { AlertTriangle, LayoutGrid, X, Plus, Upload, PenLine, Plug, ScanText } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, X, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
@@ -9,14 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { HazardPanel } from './hazard-panel'
 import { ZoningPanel } from './zoning-panel'
 
@@ -31,14 +23,9 @@ export function HazardControls() {
   const { hazardLayers, zoningPmtileUrl } = useMapContext()
   const { selectedCity } = useCityContext()
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
-  const navigate = useNavigate()
 
   const hasHazards = hazardLayers.length > 0
   const hasZoning  = !!zoningPmtileUrl || !!selectedCity?.id
-
-  function togglePanel(panel: ActivePanel) {
-    setActivePanel(prev => (prev === panel ? null : panel))
-  }
 
   const disabled: Record<NonNullable<ActivePanel>, boolean> = {
     hazard: !hasHazards,
@@ -56,47 +43,11 @@ export function HazardControls() {
                 {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
               </CardTitle>
               <div className="flex items-center gap-0.5 -mr-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground">
-                      <Plus className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" side="bottom" className="w-52">
-                    {activePanel === 'hazard' ? (
-                      <>
-                        <DropdownMenuLabel className="text-xs">Add Hazard Data</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Upload className="size-4" />
-                          Upload file
-                          <span className="ml-auto text-[10px] text-muted-foreground">GeoJSON / ZIP</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <PenLine className="size-4" />
-                          Manual entry
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Plug className="size-4" />
-                          Through API
-                        </DropdownMenuItem>
-                      </>
-                    ) : (
-                      <>
-                        <DropdownMenuLabel className="text-xs">Add Zoning Data</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => void navigate({ to: '/zoning/zoning-map' as never })}>
-                          <ScanText className="size-4" />
-                          OCR + Georeferencing
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <PenLine className="size-4" />
-                          Manual entry
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground" asChild>
+                  <Link to={(activePanel === 'hazard' ? '/hazard' : '/zoning') as never}>
+                    <Plus className="size-3.5" />
+                  </Link>
+                </Button>
 
                 <Button
                   variant="ghost"
@@ -113,11 +64,7 @@ export function HazardControls() {
           <Separator className="mt-2 shrink-0" />
 
           <CardContent className="flex flex-col flex-1 min-h-0 p-0">
-            {activePanel === 'hazard' ? (
-              <HazardPanel />
-            ) : (
-              <ZoningPanel />
-            )}
+            {activePanel === 'hazard' ? <HazardPanel /> : <ZoningPanel />}
           </CardContent>
         </Card>
       )}
@@ -126,7 +73,7 @@ export function HazardControls() {
         <div className="pointer-events-auto self-center flex flex-col gap-0.5 rounded-xl bg-black/65 backdrop-blur-md shadow-2xl p-1.5 border border-white/10">
           {STRIP_BUTTONS.map((btn, i) => {
             const Icon = btn.icon
-            const isActive = activePanel === btn.id
+            const isActive   = activePanel === btn.id
             const isDisabled = disabled[btn.id]
             return (
               <div key={btn.id}>
@@ -138,7 +85,7 @@ export function HazardControls() {
                       size="icon"
                       aria-label={btn.label}
                       disabled={isDisabled}
-                      onClick={() => togglePanel(btn.id)}
+                      onClick={() => setActivePanel(prev => prev === btn.id ? null : btn.id)}
                       className={cn(
                         'size-9 rounded-lg transition-all',
                         'hover:bg-white/15 text-white/60 hover:text-white',

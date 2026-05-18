@@ -6,6 +6,7 @@ export interface CityData {
   selectedCity: CityResponse | null
   cityId: string | null
   cityBoundary: BoundaryGeometry | null
+  isBoundaryLoading: boolean
   selectCity: (cityId: string) => Promise<void>
   clearCity: () => void
 }
@@ -14,6 +15,7 @@ export const CityContext = createContext<CityData>({
   selectedCity: null,
   cityId: null,
   cityBoundary: null,
+  isBoundaryLoading: false,
   selectCity: async () => {},
   clearCity: () => {},
 })
