@@ -5,11 +5,12 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t bg-muted/30 py-12">
+    <footer className="bg-background border-t border-border py-8">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-8 sm:grid-cols-4 md:grid-cols-5">
-          {/* Brand */}
-          <div className="sm:col-span-2 md:col-span-1">
+        {/* Changed from md:grid-cols-4 to md:grid-cols-5 */}
+        <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
+          {/* Brand - Changed from md:col-span-1 to md:col-span-2 */}
+          <div className="sm:col-span-2 md:col-span-2">
             <Link
               to="/"
               className="flex items-center gap-2 text-sm font-semibold mb-4"
@@ -108,10 +109,12 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 border-t pt-8">
-          <p className="text-sm text-muted-foreground text-center">
-            © {currentYear} BizNest. All rights reserved.
-          </p>
+        <div className="mt-8 border-t pt-6">
+          <div className="flex items-center justify-center">
+            <p className="text-sm text-muted-foreground text-center">
+              © {currentYear} BizNest. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
     </footer>
