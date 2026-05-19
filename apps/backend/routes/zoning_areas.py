@@ -64,9 +64,10 @@ def process_zoning_image(
     return zoning_area_service.process_zoning_image(city_id, payload, current_user.id, db)
 
 
-@router.get("/{city_id}/zoning/pmtiles", response_model=ZoningPmtilesResponse)
+@router.get("/{city_id}/zoning/pmtiles", response_model=ZoningPmtilesResponse | None)
 def get_zoning_pmtiles(city_id: UUID, db: Session = Depends(get_db)):
-    """Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile."""
+    """Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile.
+    Returns null if no PMTile has been generated for this city yet."""
     return zoning_area_service.get_city_pmtile_url(city_id, db)
 
 

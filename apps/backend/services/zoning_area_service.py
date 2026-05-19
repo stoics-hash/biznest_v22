@@ -316,10 +316,10 @@ def get_geojson(city_id: UUID, db: Session, bbox: str | None = None) -> dict:
     return {"type": "FeatureCollection", "features": features}
 
 
-def get_city_pmtile_url(city_id: UUID, db: Session) -> ZoningPmtilesResponse:
+def get_city_pmtile_url(city_id: UUID, db: Session) -> ZoningPmtilesResponse | None:
     """
     Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile.
-    Raises 404 if no PMTile has been generated for this city yet.
+    Returns None if no PMTile has been generated for this city yet.
     """
     zone = (
         db.query(ZoningArea)
@@ -327,9 +327,6 @@ def get_city_pmtile_url(city_id: UUID, db: Session) -> ZoningPmtilesResponse:
         .first()
     )
     if not zone:
-        raise HTTPException(
-            status_code=404,
-            detail="No zoning PMTile found for this city. Run process-image first.",
-        )
+        return None
     presigned = gps.presign_pmtile(zone.pmtile_url)
     return ZoningPmtilesResponse(pmtile_url=presigned, object_key=zone.pmtile_url)

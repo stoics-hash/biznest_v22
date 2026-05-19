@@ -30,6 +30,7 @@ export function CityProvider({ children }: PropsWithChildren) {
     data: cityBoundary = null,
     isLoading: isBoundaryFetching,
     isError:   isBoundaryError,
+    isSuccess: isBoundarySuccess,
     error:     boundaryQueryError,
   } = useQuery({
     queryKey: ['/cities/', cityId, 'geometry'],
@@ -40,7 +41,16 @@ export function CityProvider({ children }: PropsWithChildren) {
     retry: 1,
   })
 
-  // Sync React Query states → reducer phase
+  // Single effect owns all reducer transitions.
+  //
+  // Two-effect design (RESET on cityId + sync on query state) has a race:
+  // RESET fires → phase='idle', then sync fires but TanStack Query may be in
+  // status='pending' + fetchStatus='idle' briefly (not yet fetching, not yet
+  // success), so nothing dispatches → spinner stuck at 'idle' indefinitely.
+  //
+  // One effect avoids the race: cityId change, fetching, error, and success
+  // are all evaluated in a single pass; the fallback FETCH_START covers the
+  // transient pending-not-yet-fetching window.
   useEffect(() => {
     if (!cityId) {
       dispatchBoundary({ type: 'RESET' })
@@ -57,16 +67,14 @@ export function CityProvider({ children }: PropsWithChildren) {
       dispatchBoundary({ type: 'FETCH_ERROR', error: msg })
       return
     }
-    if (cityBoundary !== null) {
+    if (isBoundarySuccess) {
       dispatchBoundary({ type: 'FETCH_SUCCESS' })
       return
     }
-  }, [cityId, isBoundaryFetching, isBoundaryError, boundaryQueryError, cityBoundary])
-
-  // Reset on city change so the old phase doesn't linger
-  useEffect(() => {
-    dispatchBoundary({ type: 'RESET' })
-  }, [cityId])
+    // cityId is set but query is pending and hasn't started fetching yet —
+    // show spinner rather than leaving phase at its previous stale value.
+    dispatchBoundary({ type: 'FETCH_START' })
+  }, [cityId, isBoundaryFetching, isBoundaryError, boundaryQueryError, isBoundarySuccess])
 
   function clearCity() {}
 
