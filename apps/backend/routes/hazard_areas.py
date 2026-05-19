@@ -68,6 +68,17 @@ def get_hazard_geojson(
     )
 
 
+@router.get("/{city_id}/hazards/geometry", response_model=list[HazardAreaResponse])
+def get_hazard_geometry(
+    city_id: UUID,
+    hazard_type: str | None = Query(default=None, description="flood | landslide | storm_surge | debris_flow | faultline"),
+    scenario: str | None = Query(default=None, description="5yr | 25yr | 100yr | ssa1-ssa4"),
+    db: Session = Depends(get_db),
+):
+    """Returns only geometry records — cache separately from metadata."""
+    return hazard_area_service.get_geometry_by_city(city_id, db, hazard_type, scenario)
+
+
 @router.get("/{city_id}/hazards/{hazard_id}", response_model=HazardAreaSummary)
 def get_hazard_area(city_id: UUID, hazard_id: UUID, db: Session = Depends(get_db)):
     return hazard_area_service.get_or_404(hazard_id, city_id, db)

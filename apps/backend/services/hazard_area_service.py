@@ -46,6 +46,20 @@ def get_by_city(city_id: UUID, db: Session) -> list[HazardArea]:
     return db.query(HazardArea).filter(HazardArea.city_id == city_id).all()
 
 
+def get_geometry_by_city(
+    city_id: UUID,
+    db: Session,
+    hazard_type: str | None = None,
+    scenario: str | None = None,
+) -> list[HazardArea]:
+    q = db.query(HazardArea).filter(HazardArea.city_id == city_id, HazardArea.geometry.isnot(None))
+    if hazard_type:
+        q = q.filter(HazardArea.hazard_type == hazard_type)
+    if scenario:
+        q = q.filter(HazardArea.scenario == scenario)
+    return q.all()
+
+
 def get_or_404(hazard_id: UUID, city_id: UUID, db: Session) -> HazardArea:
     hazard = (
         db.query(HazardArea)

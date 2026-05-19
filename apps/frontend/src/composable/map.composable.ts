@@ -13,7 +13,7 @@ import {
   getZoningPmtilesCitiesCityIdZoningPmtilesGet,
   listZoningAreasCitiesCityIdZoningGet,
 } from '@networking/api/generated/zoning/zoning'
-import type { ZoningAreaResponse } from '@networking/api/model/zoningAreaResponse'
+import type { ZoningAreaSummary } from '@networking/api/model/zoningAreaSummary'
 import { useCityContext } from '@/context/city.context'
 
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
@@ -316,7 +316,7 @@ export function useZoningPanel() {
     enabled:  !!cityId,
     retry:    false,
   })
-  const zones: ZoningAreaResponse[] = zonesRes?.data ?? []
+  const zones: ZoningAreaSummary[] = zonesRes?.data ?? []
   const isLoading = pmtilesLoading || zonesLoading
 
   const grouped = zones.reduce<Record<string, number>>((acc, z) => {

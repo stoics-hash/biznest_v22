@@ -27,8 +27,10 @@ import type {
 
 import type {
   GetHazardGeojsonCitiesCityIdHazardsGeojsonGetParams,
+  GetHazardGeometryCitiesCityIdHazardsGeometryGetParams,
   HTTPValidationError,
   HazardAreaCreate,
+  HazardAreaResponse,
   HazardAreaSummary,
   HazardAreaUpdate,
   HazardPmtileResponse,
@@ -572,3 +574,41 @@ export const useDeleteHazardAreaCitiesCityIdHazardsHazardIdDelete = <TError = Ax
       > => {
       return useMutation(getDeleteHazardAreaCitiesCityIdHazardsHazardIdDeleteMutationOptions(options));
     }
+
+
+/**
+ * @summary Get Hazard Geometry by City (full geometry per record, filterable)
+ */
+export const getHazardGeometryCitiesCityIdHazardsGeometryGet = (
+    cityId: string,
+    params?: GetHazardGeometryCitiesCityIdHazardsGeometryGetParams, options?: AxiosRequestConfig
+): Promise<AxiosResponse<HazardAreaResponse[]>> => {
+    return axios.default.get(`/cities/${cityId}/hazards/geometry`, {
+      ...options,
+      params: { ...params, ...options?.params },
+    });
+  }
+
+export const getGetHazardGeometryCitiesCityIdHazardsGeometryGetQueryKey = (cityId: string, params?: GetHazardGeometryCitiesCityIdHazardsGeometryGetParams) => {
+    return [`/cities/${cityId}/hazards/geometry`, ...(params ? [params] : [])] as const;
+  }
+
+export const getGetHazardGeometryCitiesCityIdHazardsGeometryGetQueryOptions = <TData = Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, params?: GetHazardGeometryCitiesCityIdHazardsGeometryGetParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>, TError, TData>, axios?: AxiosRequestConfig}) => {
+    const {query: queryOptions, axios: axiosOptions} = options ?? {};
+    const queryKey = queryOptions?.queryKey ?? getGetHazardGeometryCitiesCityIdHazardsGeometryGetQueryKey(cityId, params);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>> = ({ signal }) => getHazardGeometryCitiesCityIdHazardsGeometryGet(cityId, params, { signal, ...axiosOptions });
+    return { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>, TError, TData> & { queryKey: QueryKey }
+  }
+
+export type GetHazardGeometryCitiesCityIdHazardsGeometryGetQueryResult = NonNullable<Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>>
+export type GetHazardGeometryCitiesCityIdHazardsGeometryGetQueryError = AxiosError<HTTPValidationError>
+
+export function useGetHazardGeometryCitiesCityIdHazardsGeometryGet<TData = Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>, TError = AxiosError<HTTPValidationError>>(
+  cityId: string,
+  params?: GetHazardGeometryCitiesCityIdHazardsGeometryGetParams,
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHazardGeometryCitiesCityIdHazardsGeometryGet>>, TError, TData>, axios?: AxiosRequestConfig}
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHazardGeometryCitiesCityIdHazardsGeometryGetQueryOptions(cityId, params, options)
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
