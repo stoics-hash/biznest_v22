@@ -5,8 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TokenVerifyResponse {
-  valid: boolean;
-  email: string;
-  city_id: string;
-}
+export type HazardAreaResponseGeometry = { [key: string]: unknown } | null;

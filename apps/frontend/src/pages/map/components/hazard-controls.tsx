@@ -1,7 +1,6 @@
-import { AlertTriangle, LayoutGrid, X, Plus } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
@@ -42,22 +41,14 @@ export function HazardControls() {
               <CardTitle className="text-sm font-semibold">
                 {activePanel === 'hazard' ? 'Hazard Layers' : 'Zoning Layers'}
               </CardTitle>
-              <div className="flex items-center gap-0.5 -mr-1">
-                <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-foreground" asChild>
-                  <Link to={(activePanel === 'hazard' ? '/hazard' : '/zoning') as never}>
-                    <Plus className="size-3.5" />
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => setActivePanel(null)}
-                >
-                  <X className="size-3.5" />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 -mr-1 text-muted-foreground hover:text-foreground"
+                onClick={() => setActivePanel(null)}
+              >
+                <X className="size-3.5" />
+              </Button>
             </div>
           </CardHeader>
 

@@ -8,6 +8,7 @@ import { LogOut, MapPin, ChevronsUpDown, Check, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthContext } from "@/context/auth.context";
 import { useCityContext } from "@/context/city.context";
+import { useRole, useCityIds, useIsRole } from "@/hooks/use-permission";
 import { listCitiesCitiesGet } from "@networking/api/generated/cities/cities";
 import type { CityResponse } from "@networking/api/model/cityResponse";
 import {
@@ -78,7 +79,9 @@ function NavItems({ sections }: { sections: NavSection[] }) {
   );
 }
 
-function CitySwitcher({ cityIds }: { cityIds: string[] }) {
+function CitySwitcher() {
+  const cityIds = useCityIds();
+  const isInvestor = useIsRole('investor');
   const { selectedCity, selectCity } = useCityContext();
   const navigate = useNavigate();
 
@@ -124,7 +127,7 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
                 {myCities.map((city) => (
                   <DropdownMenuItem
                     key={city.id}
-                    onClick={() => void selectCity(city.id)}
+                    onClick={() => void selectCity(city)}
                     className="gap-2"
                   >
                     <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
@@ -141,14 +144,18 @@ function CitySwitcher({ cityIds }: { cityIds: string[] }) {
                     )}
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => void navigate({ to: "/city-setup" as never })}
-                  className="gap-2 text-muted-foreground"
-                >
-                  <Search className="size-3.5 shrink-0" />
-                  <span className="text-sm">Browse cities</span>
-                </DropdownMenuItem>
+                {isInvestor && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => void navigate({ to: "/city-setup" as never })}
+                      className="gap-2 text-muted-foreground"
+                    >
+                      <Search className="size-3.5 shrink-0" />
+                      <span className="text-sm">Browse cities</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
@@ -168,6 +175,7 @@ const FULLSCREEN_MAP_PATHS: string[] = [];
 export function AuthenticatedLayout() {
   const { state, signOut } = useAuthContext();
   const { location } = useRouterState();
+  const role = useRole();
 
   if (state.state !== "AUTHENTICATED") return null;
 
@@ -197,7 +205,7 @@ export function AuthenticatedLayout() {
   const isFullscreenMap = FULLSCREEN_MAP_PATHS.some((p) =>
     location.pathname.startsWith(p),
   );
-  const { user, role_name, city_ids } = state;
+  const { user } = state;
 
   const sections = getNavSections(state.permissions ?? []);
 
@@ -221,7 +229,7 @@ export function AuthenticatedLayout() {
           </SidebarHeader>
 
           <SidebarContent>
-            <CitySwitcher cityIds={city_ids} />
+            <CitySwitcher />
             <NavItems sections={sections} />
           </SidebarContent>
 
@@ -240,9 +248,9 @@ export function AuthenticatedLayout() {
                     <span className="truncate text-sm font-medium">
                       {user.full_name ?? user.email}
                     </span>
-                    {role_name && (
+                    {role && (
                       <span className="truncate text-xs text-sidebar-foreground/60 capitalize">
-                        {role_name.replace("_", " ")}
+                        {role.replace("_", " ")}
                       </span>
                     )}
                   </div>

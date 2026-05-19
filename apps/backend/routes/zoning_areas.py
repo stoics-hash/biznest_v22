@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from schema.ZoningAreaDto import (
     ZoningAreaCreate,
+    ZoningAreaGeometryResponse,
     ZoningAreaResponse,
+    ZoningAreaSummary,
     ZoningAreaUpdate,
     ZoningImageProcessRequest,
     ZoningPmtilesResponse,
@@ -20,7 +22,7 @@ from core.db import get_db
 router = APIRouter()
 
 
-@router.get("/{city_id}/zoning", response_model=list[ZoningAreaResponse])
+@router.get("/{city_id}/zoning", response_model=list[ZoningAreaSummary])
 def list_zoning_areas(city_id: UUID, db: Session = Depends(get_db)):
     return zoning_area_service.get_by_city(city_id, db)
 
@@ -97,7 +99,13 @@ def get_zoning_geojson(
     )
 
 
-@router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaResponse)
+@router.get("/{city_id}/zoning/geometry", response_model=list[ZoningAreaGeometryResponse])
+def get_zoning_geometry(city_id: UUID, db: Session = Depends(get_db)):
+    """Returns only id + city_id + geometry for all zones — cache separately from metadata."""
+    return zoning_area_service.get_geometry_by_city(city_id, db)
+
+
+@router.get("/{city_id}/zoning/{zone_id}", response_model=ZoningAreaSummary)
 def get_zoning_area(city_id: UUID, zone_id: UUID, db: Session = Depends(get_db)):
     return zoning_area_service.get_or_404(zone_id, city_id, db)
 

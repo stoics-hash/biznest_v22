@@ -94,3 +94,4 @@ class LguRegisterRequest(BaseModel):
 class TokenVerifyResponse(BaseModel):
     valid: bool
     email: EmailStr
+    city_id: UUID

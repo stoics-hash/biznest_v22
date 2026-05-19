@@ -46,7 +46,6 @@ ROLES = {
         "manage:subscription",
     ],
     "lgu_admin": [
-        "manage:city",
         "zoning:read",
         "zoning:write",
         "hazard:read",

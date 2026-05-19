@@ -112,7 +112,7 @@ def create_invitation(payload: LguInviteRequest, created_by: User, db: Session) 
 
 def verify_invitation(token: str, email: str, db: Session) -> dict:
     invitation = _get_valid_invitation(token, email, db)
-    return {"valid": True, "email": invitation.email}
+    return {"valid": True, "email": invitation.email, "city_id": invitation.city_id}
 
 
 def register_from_token(payload: LguRegisterRequest, response: Response, db: Session) -> AuthResponse:

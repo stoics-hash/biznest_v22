@@ -4,6 +4,7 @@ import axios from 'axios'
 import { getCityCitiesCityIdGet } from '@networking/api/generated/cities/cities'
 import { useAuthContext } from '@/context/auth.context'
 import { CityContext, type CityData } from '@/context/city.context'
+import type { CityResponse } from '@networking/api/model/cityResponse'
 import type { BoundaryGeometry } from '@/engine/map.engine'
 import { boundaryReducer, BOUNDARY_INITIAL } from '@/reducer/boundary.reducer'
 
@@ -14,6 +15,10 @@ interface CityGeometryResponse {
 
 export function CityProvider({ children }: PropsWithChildren) {
   const { state, selectCity: authSelectCity } = useAuthContext()
+
+  function selectCity(city: CityResponse) {
+    return authSelectCity(city.id)
+  }
 
   const cityId = state.state === 'AUTHENTICATED' ? (state.city_id ?? null) : null
 
@@ -85,7 +90,7 @@ export function CityProvider({ children }: PropsWithChildren) {
     boundaryPhase: boundaryState.phase,
     boundaryError: boundaryState.error,
     clearCity,
-    selectCity: authSelectCity,
+    selectCity,
   }
 
   return <CityContext.Provider value={value}>{children}</CityContext.Provider>

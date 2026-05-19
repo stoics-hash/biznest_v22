@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Minus } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
@@ -7,6 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
+import { usePermission } from '@/hooks/use-permission'
+import { PERMISSION } from '@/config/permissions'
 import { useListHazardPmtilesCitiesCityIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
 
 const HAZARD_COLORS: Record<string, string> = {
@@ -46,6 +49,8 @@ const SWITCH_BASE = 'shrink-0 data-unchecked:bg-muted-foreground/20'
 export function HazardPanel() {
   const { visibleHazardKeys, toggleHazard } = useMapContext()
   const { selectedCity } = useCityContext()
+  const canWrite = usePermission(PERMISSION.HAZARD_WRITE)
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const { data, isLoading } = useListHazardPmtilesCitiesCityIdHazardsPmtilesGet(
@@ -86,6 +91,19 @@ export function HazardPanel() {
   }
 
   return (
+    <div className="flex flex-col flex-1 min-h-0">
+    {canWrite && (
+      <div className="px-3 pt-2 pb-1 shrink-0">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 w-full text-xs gap-1.5"
+          onClick={() => void navigate({ to: '/hazard' as never })}
+        >
+          <Plus className="size-3.5" /> Add Hazard Data
+        </Button>
+      </div>
+    )}
     <ScrollArea className="flex-1 min-h-0">
       <div className="px-3 pb-3 space-y-1">
         {groups.map((group, gi) => {
@@ -166,5 +184,6 @@ export function HazardPanel() {
         })}
       </div>
     </ScrollArea>
+    </div>
   )
 }
