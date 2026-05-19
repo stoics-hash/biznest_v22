@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useRegisterForm } from "./composables/use-register-form";
 import { RegisterForm } from "./components/register-form";
 import { AuthImagePanel } from "./components/auth-image-panel";
@@ -7,7 +8,7 @@ import { getRandomQuote } from "@/config/quotes";
 export function RegisterPage() {
   const form = useRegisterForm();
 
-  const quote = getRandomQuote();
+  const [quote] = useState(() => getRandomQuote());
 
   return (
     <div className="flex flex-col min-h-screen">
