@@ -71,10 +71,8 @@ ROLES = {
         "alert:read",
         "alert:write",
         "analytics:view",
-        "location:save",
         "manage:user",
         "manage:role",
-        "manage:subscription",
         "manage:logs",
     ],
 }
