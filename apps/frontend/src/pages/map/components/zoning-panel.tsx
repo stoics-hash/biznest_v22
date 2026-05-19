@@ -7,10 +7,13 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useZoningPanel } from '@/composable/map.composable'
+import { usePermission } from '@/hooks/use-permission'
+import { PERMISSION } from '@/config/permissions'
 
 export function ZoningPanel() {
   const { visibleZoningTypes, toggleZoningType, showZoning } = useMapContext()
   const { pmtileUrl, zones, zoneTypes, isLoading } = useZoningPanel()
+  const canWrite = usePermission(PERMISSION.ZONING_WRITE)
   const navigate = useNavigate()
 
   if (isLoading) return (
@@ -26,26 +29,40 @@ export function ZoningPanel() {
         <p className="text-xs text-muted-foreground leading-relaxed">
           No zoning data for this city yet.
         </p>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs gap-1.5"
-          onClick={() => void navigate({ to: '/zoning' as never })}
-        >
-          <Plus className="size-3.5" /> Add Zoning Data
-        </Button>
+        {canWrite && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1.5"
+            onClick={() => void navigate({ to: '/zoning' as never })}
+          >
+            <Plus className="size-3.5" /> Add Zoning Data
+          </Button>
+        )}
       </div>
     </div>
   )
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {pmtileUrl && (
-        <div className="px-3 py-2 shrink-0 flex items-center gap-2">
-          <div className="size-2 rounded-full bg-green-500 shrink-0" />
-          <span className="text-[11px] text-muted-foreground">Vector tile layer loaded</span>
-        </div>
-      )}
+      <div className="px-3 pt-2 pb-1 shrink-0 flex items-center gap-2">
+        {pmtileUrl && (
+          <>
+            <div className="size-2 rounded-full bg-green-500 shrink-0" />
+            <span className="text-[11px] text-muted-foreground flex-1">Tile layer loaded</span>
+          </>
+        )}
+        {canWrite && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1.5 ml-auto"
+            onClick={() => void navigate({ to: '/zoning' as never })}
+          >
+            <Plus className="size-3.5" /> Add
+          </Button>
+        )}
+      </div>
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-3 py-2 space-y-0">
