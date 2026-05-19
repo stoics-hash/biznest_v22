@@ -1,34 +1,31 @@
 import { useReducer, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import {
-  ArrowLeft, CheckCircle2, FileJson, Move, Pencil, RotateCcw,
-  ScanText, Upload, X, XCircle, PenLine,
-} from 'lucide-react'
+import { ArrowLeft, PenLine, ScanText, Upload, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Polygon } from 'geojson'
+import axios from 'axios'
 import { Map } from '@/components/map'
 import { MapContext, useMapContext } from '@/context/map.context'
 import type { MapEngine } from '@/engine/map.engine'
 import { useCityContext } from '@/context/city.context'
-import { useDrawPolygon } from '@/pages/map/composables/use-draw-polygon'
+import { useDrawPolygon, saveWithDispatch } from '@/composable/map.composable'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { MapDrawPanel, mapSelectCls } from '@/components/map/map-draw-panel'
+import { MapUploadPanel } from '@/components/map/map-upload-panel'
 import {
   hazardDrawReducer,
   HAZARD_DRAW_INITIAL,
   type HazardType,
   type HazardScenario,
-  type DrawMode,
 } from '@/reducer/hazard-draw.reducer'
 import {
   hazardUploadReducer,
   HAZARD_UPLOAD_INITIAL,
 } from '@/reducer/hazard-upload.reducer'
-
-const API_URL = import.meta.env.VITE_API_URL as string
 
 const HAZARD_TYPES: HazardType[]     = ['flood', 'landslide', 'storm_surge', 'debris_flow', 'faultline']
 const SCENARIOS:    HazardScenario[] = ['5yr', '25yr', '100yr', 'ssa1', 'ssa2', 'ssa3', 'ssa4']
@@ -39,238 +36,6 @@ const PANEL_BUTTONS: { id: NonNullable<ActivePanel>; icon: LucideIcon; label: st
   { id: 'draw',   icon: PenLine, label: 'Draw Hazard Area' },
   { id: 'upload', icon: Upload,  label: 'Upload GeoJSON' },
 ]
-
-// ── GeoJSON file parser ───────────────────────────────────────────────────────
-
-function extractPolygon(text: string): Polygon | null {
-  try {
-    const json = JSON.parse(text) as Record<string, unknown>
-    if (json.type === 'Polygon') return json as unknown as Polygon
-    if (json.type === 'Feature') {
-      const geom = (json as { geometry?: { type?: string } }).geometry
-      if (geom?.type === 'Polygon') return geom as unknown as Polygon
-    }
-    if (json.type === 'FeatureCollection') {
-      const feat = (json as { features?: { geometry?: { type?: string } }[] }).features?.[0]
-      if (feat?.geometry?.type === 'Polygon') return feat.geometry as unknown as Polygon
-    }
-    return null
-  } catch { return null }
-}
-
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload  = e => resolve(e.target?.result as string)
-    reader.onerror = reject
-    reader.readAsText(file)
-  })
-}
-
-const selectCls =
-  'w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs ' +
-  'focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 capitalize'
-
-// ── Draw panel ────────────────────────────────────────────────────────────────
-
-function DrawPanelContent({
-  draw, dispatch, onStartDrawing, onCancelDrawing, onSave,
-}: {
-  draw:            ReturnType<typeof hazardDrawReducer>
-  dispatch:        React.Dispatch<Parameters<typeof hazardDrawReducer>[1]>
-  onStartDrawing:  () => void
-  onCancelDrawing: () => void
-  onSave:          () => Promise<void>
-}) {
-  const locked = draw.phase === 'drawing' || draw.phase === 'saving'
-  return (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto flex-1">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hazard Type</label>
-        <select disabled={locked} value={draw.hazardType}
-          onChange={e => dispatch({ type: 'SET_HAZARD_TYPE', hazardType: e.target.value as HazardType })}
-          className={selectCls}>
-          {HAZARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Scenario</label>
-        <select disabled={locked} value={draw.scenario}
-          onChange={e => dispatch({ type: 'SET_SCENARIO', scenario: e.target.value as HazardScenario })}
-          className={selectCls}>
-          {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Severity</label>
-          <span className="text-xs font-semibold tabular-nums">{draw.severity} / 5</span>
-        </div>
-        <input type="range" min={1} max={5} step={1} disabled={draw.phase === 'saving'}
-          value={draw.severity} onChange={e => dispatch({ type: 'SET_SEVERITY', severity: Number(e.target.value) })}
-          className="w-full accent-primary disabled:opacity-50" />
-        <div className="flex justify-between text-[9px] text-muted-foreground"><span>Low</span><span>High</span></div>
-      </div>
-      <Separator />
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Draw Mode</span>
-        <div className="flex gap-1">
-          {(['draw_polygon', 'draw_freehand'] as DrawMode[]).map(m => (
-            <button key={m} disabled={locked} onClick={() => dispatch({ type: 'SET_DRAW_MODE', drawMode: m })}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs border transition-all',
-                'disabled:pointer-events-none disabled:opacity-40',
-                draw.drawMode === m
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground',
-              )}>
-              {m === 'draw_polygon' ? <Pencil className="size-3" /> : <Move className="size-3" />}
-              {m === 'draw_polygon' ? 'Polygon' : 'Freehand'}
-            </button>
-          ))}
-        </div>
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
-          {draw.drawMode === 'draw_polygon' ? 'Click to place points · double-click to finish' : 'Hold and drag on the map'}
-        </p>
-      </div>
-      <Separator />
-      {draw.phase === 'drawing' && (
-        <Button size="sm" variant="outline" className="w-full text-xs h-8" onClick={onCancelDrawing}>Cancel Drawing</Button>
-      )}
-      {(draw.phase === 'configuring' || draw.phase === 'drawn') && (
-        <Button size="sm" className="w-full text-xs h-8" onClick={onStartDrawing}>
-          {draw.phase === 'drawn' ? 'Redraw' : 'Start Drawing'}
-        </Button>
-      )}
-      {(draw.phase === 'drawn' || draw.phase === 'error') && draw.geometry && (
-        <div className="rounded-md bg-muted/60 px-3 py-2 text-[11px] flex items-center gap-2">
-          <CheckCircle2 className="size-3.5 text-green-500 shrink-0" />
-          <span>Shape ready · <span className="font-medium tabular-nums">{draw.pointCount} pts</span></span>
-          <button onClick={() => dispatch({ type: 'CLEAR_SHAPE' })}
-            className="ml-auto text-[10px] text-muted-foreground hover:text-foreground">Clear</button>
-        </div>
-      )}
-      {draw.phase === 'drawn'  && <Button size="sm" className="w-full text-xs h-8" onClick={() => void onSave()}>Save to Map</Button>}
-      {draw.phase === 'saving' && <Button size="sm" disabled className="w-full text-xs h-8">Saving…</Button>}
-      {draw.phase === 'saved' && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-            <CheckCircle2 className="size-3.5" />Saved — layer updated on map
-          </div>
-          <Button size="sm" variant="outline" className="w-full text-xs h-8" onClick={() => dispatch({ type: 'DRAW_ANOTHER' })}>
-            <RotateCcw className="size-3 mr-1.5" />Draw Another
-          </Button>
-        </div>
-      )}
-      {draw.phase === 'error' && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start gap-1.5 text-xs text-destructive">
-            <XCircle className="size-3.5 mt-0.5 shrink-0" /><span>{draw.errorMsg}</span>
-          </div>
-          <Button size="sm" className="w-full text-xs h-8" onClick={() => void onSave()}>Retry Save</Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Upload panel ──────────────────────────────────────────────────────────────
-
-function UploadPanelContent({
-  upload, dispatch, onSave,
-}: {
-  upload:   ReturnType<typeof hazardUploadReducer>
-  dispatch: React.Dispatch<Parameters<typeof hazardUploadReducer>[1]>
-  onSave:   () => Promise<void>
-}) {
-  const locked = upload.phase === 'saving'
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const text = await readFileAsText(file)
-    const geom = extractPolygon(text)
-    if (!geom) { dispatch({ type: 'CLEAR_FILE' }); return }
-    dispatch({ type: 'SET_FILE', fileName: file.name, geometry: geom })
-  }
-  return (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto flex-1">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">GeoJSON File</label>
-        <label className={cn(
-          'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 cursor-pointer transition-colors text-center',
-          locked ? 'pointer-events-none opacity-50' : 'hover:border-primary/50 hover:bg-muted/30',
-          upload.fileName ? 'border-green-500/50 bg-green-500/5' : 'border-border',
-        )}>
-          {upload.fileName ? (
-            <>
-              <FileJson className="size-6 text-green-500" />
-              <span className="text-[11px] font-medium text-green-600 break-all">{upload.fileName}</span>
-              <button type="button" onClick={e => { e.preventDefault(); dispatch({ type: 'CLEAR_FILE' }) }}
-                className="text-[10px] text-muted-foreground hover:text-destructive">Remove</button>
-            </>
-          ) : (
-            <>
-              <Upload className="size-5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">Click to select a file</span>
-              <span className="text-[10px] text-muted-foreground/60">GeoJSON · Polygon geometry</span>
-            </>
-          )}
-          <input type="file" accept=".geojson,.json" className="hidden" disabled={locked}
-            onChange={e => void handleFileChange(e)} />
-        </label>
-      </div>
-      <Separator />
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hazard Type</label>
-        <select disabled={locked} value={upload.hazardType}
-          onChange={e => dispatch({ type: 'SET_HAZARD_TYPE', hazardType: e.target.value as HazardType })}
-          className={selectCls}>
-          {HAZARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Scenario</label>
-        <select disabled={locked} value={upload.scenario}
-          onChange={e => dispatch({ type: 'SET_SCENARIO', scenario: e.target.value as HazardScenario })}
-          className={selectCls}>
-          {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Severity</label>
-          <span className="text-xs font-semibold tabular-nums">{upload.severity} / 5</span>
-        </div>
-        <input type="range" min={1} max={5} step={1} disabled={locked}
-          value={upload.severity} onChange={e => dispatch({ type: 'SET_SEVERITY', severity: Number(e.target.value) })}
-          className="w-full accent-primary disabled:opacity-50" />
-        <div className="flex justify-between text-[9px] text-muted-foreground"><span>Low</span><span>High</span></div>
-      </div>
-      <Separator />
-      {upload.phase === 'idle'   && <Button size="sm" disabled className="w-full text-xs h-8">Select a file first</Button>}
-      {upload.phase === 'ready'  && <Button size="sm" className="w-full text-xs h-8" onClick={() => void onSave()}>Save to Map</Button>}
-      {upload.phase === 'saving' && <Button size="sm" disabled className="w-full text-xs h-8">Saving…</Button>}
-      {upload.phase === 'saved' && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-            <CheckCircle2 className="size-3.5" />Saved — layer updated on map
-          </div>
-          <Button size="sm" variant="outline" className="w-full text-xs h-8" onClick={() => dispatch({ type: 'RESET' })}>
-            <RotateCcw className="size-3 mr-1.5" />Upload Another
-          </Button>
-        </div>
-      )}
-      {upload.phase === 'error' && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start gap-1.5 text-xs text-destructive">
-            <XCircle className="size-3.5 mt-0.5 shrink-0" /><span>{upload.errorMsg}</span>
-          </div>
-          <Button size="sm" className="w-full text-xs h-8" onClick={() => void onSave()}>Retry Save</Button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
@@ -294,7 +59,15 @@ export function HazardPage() {
   const [uploadState, dispatchUpload] = useReducer(hazardUploadReducer, HAZARD_UPLOAD_INITIAL)
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
 
-  const draw = useDrawPolygon(engine)
+  // ── Draw with callback — no bridge effect needed ──────────────────────────
+  const draw = useDrawPolygon(engine, (geometry, pointCount, mode) => {
+    if (mode === 'draw_freehand') {
+      dispatchDraw({ type: 'FREEHAND_COMPLETE', geometry, pointCount })
+      void saveHazardGeometry(geometry)
+    } else {
+      dispatchDraw({ type: 'SHAPE_DRAWN', geometry, pointCount })
+    }
+  })
 
   // ── City boundary ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -302,17 +75,6 @@ export function HazardPage() {
     engine.flyToCityBoundary(cityBoundary)
     engine.setCityBoundary(cityBoundary)
   }, [engine, cityBoundary])
-
-  // ── Bridge: drawn shape → reducer ─────────────────────────────────────────
-  const phaseRef = useRef(drawState.phase)
-  phaseRef.current = drawState.phase
-
-  useEffect(() => {
-    if (draw.drawnGeometry && phaseRef.current === 'drawing') {
-      dispatchDraw({ type: 'SHAPE_DRAWN', geometry: draw.drawnGeometry, pointCount: draw.pointCount })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draw.drawnGeometry])
 
   function handleTogglePanel(panel: ActivePanel) {
     if (activePanel === panel) { if (panel === 'draw') draw.deactivate(); setActivePanel(null) }
@@ -322,41 +84,41 @@ export function HazardPage() {
   function handleStartDrawing()  { dispatchDraw({ type: 'START_DRAWING' }); void draw.activate(drawState.drawMode) }
   function handleCancelDrawing() { dispatchDraw({ type: 'CANCEL_DRAWING' }); draw.deactivate() }
 
+  async function saveHazardGeometry(geometry: Polygon) {
+    await saveWithDispatch(
+      async () => {
+        await axios.post(`/cities/${cityId}/hazards`, {
+          hazard_type: drawState.hazardType, scenario: drawState.scenario,
+          severity: drawState.severity, geometry,
+        })
+        const params = new URLSearchParams({ hazard_type: drawState.hazardType, scenario: drawState.scenario })
+        await axios.post(`/cities/${cityId}/hazards/regenerate-pmtiles?${params}`)
+      },
+      dispatchDraw,
+      () => draw.clearDrawn(),
+    )
+  }
+
   async function handleDrawSave() {
     if (!drawState.geometry || !cityId) return
     dispatchDraw({ type: 'SAVE_START' })
-    try {
-      const res = await fetch(`${API_URL}/cities/${cityId}/hazards`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hazard_type: drawState.hazardType, scenario: drawState.scenario, severity: drawState.severity, geometry: drawState.geometry }),
-      })
-      if (!res.ok) { const d = await res.json().catch(() => ({})) as { detail?: string }; throw new Error(d.detail ?? `HTTP ${res.status}`) }
-      const params = new URLSearchParams({ hazard_type: drawState.hazardType, scenario: drawState.scenario })
-      await fetch(`${API_URL}/cities/${cityId}/hazards/regenerate-pmtiles?${params}`, { method: 'POST', credentials: 'include' })
-      dispatchDraw({ type: 'SAVE_SUCCESS' })
-      draw.clearDrawn()
-    } catch (err) {
-      dispatchDraw({ type: 'SAVE_ERROR', errorMsg: err instanceof Error ? err.message : 'Save failed' })
-    }
+    await saveHazardGeometry(drawState.geometry)
   }
 
   async function handleUploadSave() {
     if (!uploadState.geometry || !cityId) return
     dispatchUpload({ type: 'SAVE_START' })
-    try {
-      const res = await fetch(`${API_URL}/cities/${cityId}/hazards`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hazard_type: uploadState.hazardType, scenario: uploadState.scenario, severity: uploadState.severity, geometry: uploadState.geometry }),
-      })
-      if (!res.ok) { const d = await res.json().catch(() => ({})) as { detail?: string }; throw new Error(d.detail ?? `HTTP ${res.status}`) }
-      const params = new URLSearchParams({ hazard_type: uploadState.hazardType, scenario: uploadState.scenario })
-      await fetch(`${API_URL}/cities/${cityId}/hazards/regenerate-pmtiles?${params}`, { method: 'POST', credentials: 'include' })
-      dispatchUpload({ type: 'SAVE_SUCCESS' })
-    } catch (err) {
-      dispatchUpload({ type: 'SAVE_ERROR', errorMsg: err instanceof Error ? err.message : 'Save failed' })
-    }
+    await saveWithDispatch(
+      async () => {
+        await axios.post(`/cities/${cityId}/hazards`, {
+          hazard_type: uploadState.hazardType, scenario: uploadState.scenario,
+          severity: uploadState.severity, geometry: uploadState.geometry,
+        })
+        const params = new URLSearchParams({ hazard_type: uploadState.hazardType, scenario: uploadState.scenario })
+        await axios.post(`/cities/${cityId}/hazards/regenerate-pmtiles?${params}`)
+      },
+      dispatchUpload,
+    )
   }
 
   // Local MapContext — intercepts setEngine so the outer MapProvider stays clean
@@ -418,10 +180,76 @@ export function HazardPage() {
               <Separator className="mt-2 shrink-0" />
               <CardContent className="flex flex-col flex-1 min-h-0 p-0">
                 {activePanel === 'draw' ? (
-                  <DrawPanelContent draw={drawState} dispatch={dispatchDraw}
-                    onStartDrawing={handleStartDrawing} onCancelDrawing={handleCancelDrawing} onSave={handleDrawSave} />
+                  <MapDrawPanel
+                    phase={drawState.phase} drawMode={drawState.drawMode}
+                    severity={drawState.severity} pointCount={drawState.pointCount}
+                    geometry={drawState.geometry} errorMsg={drawState.errorMsg}
+                    onSetDrawMode={m => dispatchDraw({ type: 'SET_DRAW_MODE', drawMode: m })}
+                    onSetSeverity={s => dispatchDraw({ type: 'SET_SEVERITY', severity: s })}
+                    onClearShape={() => dispatchDraw({ type: 'CLEAR_SHAPE' })}
+                    onStartDrawing={handleStartDrawing}
+                    onCancelDrawing={handleCancelDrawing}
+                    onSave={handleDrawSave}
+                    onDrawAnother={() => dispatchDraw({ type: 'DRAW_ANOTHER' })}
+                  >
+                    {(() => {
+                      const locked = drawState.phase === 'drawing' || drawState.phase === 'saving'
+                      return (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hazard Type</label>
+                            <select disabled={locked} value={drawState.hazardType}
+                              onChange={e => dispatchDraw({ type: 'SET_HAZARD_TYPE', hazardType: e.target.value as HazardType })}
+                              className={mapSelectCls}>
+                              {HAZARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Scenario</label>
+                            <select disabled={locked} value={drawState.scenario}
+                              onChange={e => dispatchDraw({ type: 'SET_SCENARIO', scenario: e.target.value as HazardScenario })}
+                              className={mapSelectCls}>
+                              {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        </>
+                      )
+                    })()}
+                  </MapDrawPanel>
                 ) : (
-                  <UploadPanelContent upload={uploadState} dispatch={dispatchUpload} onSave={handleUploadSave} />
+                  <MapUploadPanel
+                    phase={uploadState.phase} fileName={uploadState.fileName}
+                    severity={uploadState.severity} errorMsg={uploadState.errorMsg}
+                    onFileReady={(fileName, geometry) => dispatchUpload({ type: 'SET_FILE', fileName, geometry })}
+                    onFileClear={() => dispatchUpload({ type: 'CLEAR_FILE' })}
+                    onSetSeverity={s => dispatchUpload({ type: 'SET_SEVERITY', severity: s })}
+                    onSave={handleUploadSave}
+                    onReset={() => dispatchUpload({ type: 'RESET' })}
+                  >
+                    {(() => {
+                      const locked = uploadState.phase === 'saving'
+                      return (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hazard Type</label>
+                            <select disabled={locked} value={uploadState.hazardType}
+                              onChange={e => dispatchUpload({ type: 'SET_HAZARD_TYPE', hazardType: e.target.value as HazardType })}
+                              className={mapSelectCls}>
+                              {HAZARD_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Scenario</label>
+                            <select disabled={locked} value={uploadState.scenario}
+                              onChange={e => dispatchUpload({ type: 'SET_SCENARIO', scenario: e.target.value as HazardScenario })}
+                              className={mapSelectCls}>
+                              {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        </>
+                      )
+                    })()}
+                  </MapUploadPanel>
                 )}
               </CardContent>
             </Card>

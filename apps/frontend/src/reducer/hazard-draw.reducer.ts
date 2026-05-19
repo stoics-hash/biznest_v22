@@ -25,18 +25,19 @@ export interface HazardDrawState {
 }
 
 export type HazardDrawAction =
-  | { type: 'SET_HAZARD_TYPE'; hazardType: HazardType }
-  | { type: 'SET_SCENARIO';    scenario:   HazardScenario }
-  | { type: 'SET_SEVERITY';    severity:   number }
-  | { type: 'SET_DRAW_MODE';   drawMode:   DrawMode }
+  | { type: 'SET_HAZARD_TYPE';    hazardType: HazardType }
+  | { type: 'SET_SCENARIO';       scenario:   HazardScenario }
+  | { type: 'SET_SEVERITY';       severity:   number }
+  | { type: 'SET_DRAW_MODE';      drawMode:   DrawMode }
   | { type: 'START_DRAWING' }
   | { type: 'CANCEL_DRAWING' }
-  | { type: 'SHAPE_DRAWN';     geometry: Polygon; pointCount: number }
+  | { type: 'SHAPE_DRAWN';        geometry: Polygon; pointCount: number }
+  | { type: 'FREEHAND_COMPLETE';  geometry: Polygon; pointCount: number }
   | { type: 'CLEAR_SHAPE' }
   | { type: 'SAVE_START' }
   | { type: 'SAVE_SUCCESS' }
-  | { type: 'SAVE_ERROR';      errorMsg: string }
-  | { type: 'DRAW_ANOTHER' }  // back to configuring, keep settings
+  | { type: 'SAVE_ERROR';         errorMsg: string }
+  | { type: 'DRAW_ANOTHER' }
 
 export const HAZARD_DRAW_INITIAL: HazardDrawState = {
   phase:      'configuring',
@@ -82,12 +83,16 @@ export function hazardDrawReducer(
       if (state.phase !== 'drawing') return state
       return { ...state, phase: 'drawn', geometry: action.geometry, pointCount: action.pointCount }
 
+    case 'FREEHAND_COMPLETE':
+      if (state.phase !== 'drawing') return state
+      return { ...state, phase: 'saving', geometry: action.geometry, pointCount: action.pointCount, errorMsg: null }
+
     case 'CLEAR_SHAPE':
       if (state.phase !== 'drawn') return state
       return { ...state, phase: 'configuring', geometry: null, pointCount: 0 }
 
     case 'SAVE_START':
-      if (state.phase !== 'drawn') return state
+      if (state.phase !== 'drawn' && state.phase !== 'error') return state
       return { ...state, phase: 'saving', errorMsg: null }
 
     case 'SAVE_SUCCESS':

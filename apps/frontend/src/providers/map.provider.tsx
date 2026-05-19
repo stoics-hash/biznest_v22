@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef, type PropsWithChildren } from 'react'
+import { useState, useEffect, useCallback, useReducer, useRef, type PropsWithChildren } from 'react'
 import { MapContext, type LightPreset, type ClickedZone } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
 import { listHazardPmtilesCitiesCityIdHazardsPmtilesGet } from '@networking/api/generated/hazards/hazards'
 import { getZoningPmtilesCitiesCityIdZoningPmtilesGet } from '@networking/api/generated/zoning/zoning'
 import type { MapEngine, HazardTile } from '@/engine/map.engine'
+import { mapLayerReducer, MAP_LAYER_INITIAL } from '@/reducer/map-layer.reducer'
 
 // ── PMTile source-layer discovery ────────────────────────────────────────────
 // Reads the PMTile's TileJSON metadata to find the first vector layer id.
@@ -39,21 +40,19 @@ export function MapProvider({ children }: PropsWithChildren) {
   const [engine, setEngine] = useState<MapEngine | null>(null)
   const [lightPreset, setLightPreset] = useState<LightPreset>('day')
   const [show3D, setShow3D] = useState(true)
-  const [hazardLayers, setHazardLayersState] = useState<HazardTile[]>([])
-  const [visibleHazardKeys, setVisibleHazardKeys] = useState<Set<string>>(new Set())
-  const [showAllHazards, setShowAllHazards] = useState(true)
-  const [zoningTile, setZoningTile] = useState<{ url: string; sourceLayer: string } | null>(null)
-  const [showZoning, setShowZoning] = useState(false)
-  const [visibleZoningTypes, setVisibleZoningTypes] = useState<Set<string> | null>(null)
+  const [layers, dispatchLayers] = useReducer(mapLayerReducer, MAP_LAYER_INITIAL)
   const [clickedZone, setClickedZone] = useState<ClickedZone | null>(null)
 
   const { selectedCity, cityBoundary } = useCityContext()
 
   // Always-current refs so onReady callbacks inside setZoningLayer read latest state.
-  const showZoningRef = useRef(showZoning)
-  showZoningRef.current = showZoning
-  const visibleZoningTypesRef = useRef(visibleZoningTypes)
-  visibleZoningTypesRef.current = visibleZoningTypes
+  const showZoningRef = useRef(layers.showZoning)
+  showZoningRef.current = layers.showZoning
+  const visibleZoningTypesRef = useRef(layers.visibleZoningTypes)
+  visibleZoningTypesRef.current = layers.visibleZoningTypes
+
+  // Destructure for use in effects (keeps dep arrays tidy)
+  const { hazardLayers, visibleHazardKeys, showAllHazards, zoningTile, showZoning, visibleZoningTypes } = layers
 
   // ── Light preset ─────────────────────────────────────────────────────────
 
@@ -85,10 +84,6 @@ export function MapProvider({ children }: PropsWithChildren) {
   }, [engine, selectedCity?.id, cityBoundary])
 
   // ── Hazard PMTile fetch ───────────────────────────────────────────────────
-  // 1. Fetch the list of PMTile URLs for the province.
-  // 2. Read each PMTile's TileJSON metadata to discover the actual source-layer
-  //    name baked in by tippecanoe — avoids hardcoding a name that may vary.
-  // PMTile URLs are presigned MinIO URLs (5-hour TTL); re-navigating refreshes them.
 
   useEffect(() => {
     if (!selectedCity?.id) return
@@ -100,22 +95,17 @@ export function MapProvider({ children }: PropsWithChildren) {
         if (cancelled) return
         const tiles = await enrichWithSourceLayers(res.data as HazardTile[])
         if (cancelled) return
-        setHazardLayersState(tiles)
-        setVisibleHazardKeys(new Set())
+        dispatchLayers({ type: 'SET_HAZARD_LAYERS', tiles })
       })
-      .catch(() => {
-        // Province has no hazard data yet.
-      })
+      .catch(() => { /* Province has no hazard data yet. */ })
 
     return () => {
       cancelled = true
-      setHazardLayersState([])
-      setVisibleHazardKeys(new Set())
+      dispatchLayers({ type: 'CLEAR_CITY' })
     }
   }, [selectedCity?.id])
 
   // ── Zoning PMTile fetch ───────────────────────────────────────────────────
-  // City-scoped (one PMTile per city). 404 = no zoning data yet.
 
   useEffect(() => {
     if (!selectedCity?.id) return
@@ -126,19 +116,17 @@ export function MapProvider({ children }: PropsWithChildren) {
       .then(async res => {
         if (cancelled) return
         const url = res.data.pmtile_url
-        const sl = await discoverSourceLayer(url)
+        const sl  = await discoverSourceLayer(url)
         if (cancelled) return
-        setZoningTile({ url, sourceLayer: sl ?? 'zoning' })
+        dispatchLayers({ type: 'SET_ZONING_TILE', tile: { url, sourceLayer: sl ?? 'zoning' } })
       })
       .catch(() => {
-        // City has no zoning data yet — stay cleared.
+        dispatchLayers({ type: 'SET_ZONING_TILE', tile: null })
       })
 
     return () => {
       cancelled = true
-      setZoningTile(null)
-      setVisibleZoningTypes(null)
-      setShowZoning(false)
+      dispatchLayers({ type: 'SET_ZONING_TILE', tile: null })
     }
   }, [selectedCity?.id])
 
@@ -182,17 +170,6 @@ export function MapProvider({ children }: PropsWithChildren) {
     }
   }, [engine, hazardLayers, visibleHazardKeys, showAllHazards])
 
-  // ── Toggle ────────────────────────────────────────────────────────────────
-
-  const toggleHazard = useCallback((key: string) => {
-    setVisibleHazardKeys(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }, [])
-
   // ── Sync zoning type filter → engine ─────────────────────────────────────
 
   useEffect(() => {
@@ -200,24 +177,17 @@ export function MapProvider({ children }: PropsWithChildren) {
     engine.setZoningTypeFilter(visibleZoningTypes === null ? null : [...visibleZoningTypes])
   }, [engine, visibleZoningTypes])
 
-  const resetZoningTypes = useCallback(() => {
-    setVisibleZoningTypes(null)
-  }, [])
+  const toggleHazard        = useCallback((key: string) =>
+    dispatchLayers({ type: 'TOGGLE_HAZARD', key }), [])
 
-  const resetHazardVisibility = useCallback(() => {
-    setVisibleHazardKeys(new Set(hazardLayers.map(t => `${t.hazard_type}::${t.scenario ?? 'all'}`)))
-  }, [hazardLayers])
+  const resetZoningTypes    = useCallback(() =>
+    dispatchLayers({ type: 'RESET_ZONING_TYPES' }), [])
 
-  const toggleZoningType = useCallback((type: string, allTypes: string[]) => {
-    setVisibleZoningTypes(prev => {
-      const expanded = prev === null ? new Set(allTypes) : new Set(prev)
-      if (expanded.has(type)) expanded.delete(type)
-      else expanded.add(type)
-      // All types visible → clear filter
-      if (expanded.size === allTypes.length) return null
-      return expanded
-    })
-  }, [])
+  const resetHazardVisibility = useCallback(() =>
+    dispatchLayers({ type: 'RESET_HAZARD_VISIBILITY' }), [])
+
+  const toggleZoningType    = useCallback((zoneType: string, allTypes: string[]) =>
+    dispatchLayers({ type: 'TOGGLE_ZONING_TYPE', zoneType, allTypes }), [])
 
   // ── Zone click handler ────────────────────────────────────────────────────
 
@@ -230,9 +200,9 @@ export function MapProvider({ children }: PropsWithChildren) {
   }, [engine])
 
   const refreshZoningLayer = useCallback(async (url: string | null) => {
-    if (!url) { setZoningTile(null); return }
+    if (!url) { dispatchLayers({ type: 'SET_ZONING_TILE', tile: null }); return }
     const sl = await discoverSourceLayer(url)
-    setZoningTile({ url, sourceLayer: sl ?? 'zoning' })
+    dispatchLayers({ type: 'SET_ZONING_TILE', tile: { url, sourceLayer: sl ?? 'zoning' } })
   }, [])
 
   const refreshHazardLayers = useCallback(async () => {
@@ -240,7 +210,7 @@ export function MapProvider({ children }: PropsWithChildren) {
     try {
       const res   = await listHazardPmtilesCitiesCityIdHazardsPmtilesGet(selectedCity.id)
       const tiles = await enrichWithSourceLayers(res.data as HazardTile[])
-      setHazardLayersState(tiles)
+      dispatchLayers({ type: 'SET_HAZARD_LAYERS', tiles })
     } catch { /* city has no hazard data */ }
   }, [selectedCity?.id])
 
@@ -254,10 +224,10 @@ export function MapProvider({ children }: PropsWithChildren) {
       visibleHazardKeys,
       toggleHazard,
       showAllHazards,
-      setShowAllHazards,
+      setShowAllHazards: (value) => dispatchLayers({ type: 'SET_SHOW_ALL_HAZARDS', value }),
       zoningPmtileUrl: zoningTile?.url ?? null,
       showZoning,
-      setShowZoning,
+      setShowZoning: (value) => dispatchLayers({ type: 'SET_SHOW_ZONING', value }),
       visibleZoningTypes,
       toggleZoningType,
       resetZoningTypes,

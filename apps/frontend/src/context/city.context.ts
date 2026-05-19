@@ -7,7 +7,7 @@ export interface CityData {
   cityId: string | null
   cityBoundary: BoundaryGeometry | null
   isBoundaryLoading: boolean
-  selectCity: (cityId: string) => Promise<void>
+  selectCity: (cityId: CityResponse) => Promise<void>
   clearCity: () => void
 }
 
