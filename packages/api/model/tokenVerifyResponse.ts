@@ -8,4 +8,5 @@
 export interface TokenVerifyResponse {
   valid: boolean;
   email: string;
+  city_id: string;
 }

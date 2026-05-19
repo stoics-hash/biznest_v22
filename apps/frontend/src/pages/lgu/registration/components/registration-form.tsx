@@ -9,8 +9,8 @@ import {InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput,} from '@
 
 interface LguRegistrationFormProps {
   email: string
-  username: string
-  setUsername: Dispatch<SetStateAction<string>>
+  fullName: string
+  setFullName: Dispatch<SetStateAction<string>>
   password: string
   setPassword: Dispatch<SetStateAction<string>>
   confirmPassword: string
@@ -22,7 +22,7 @@ interface LguRegistrationFormProps {
 
 export function LguRegistrationForm({
   email,
-  username, setUsername,
+  fullName, setFullName,
   password, setPassword,
   confirmPassword, setConfirmPassword,
   error,
@@ -67,21 +67,21 @@ export function LguRegistrationForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="full-name">Full Name</Label>
           <InputGroup>
             <InputGroupAddon>
               <User className="size-4" />
             </InputGroupAddon>
             <InputGroupInput
-              id="username"
+              id="full-name"
               type="text"
-              placeholder="your_username"
-              autoComplete="username"
+              placeholder="Juan dela Cruz"
+              autoComplete="name"
               required
-              minLength={3}
-              maxLength={50}
-              value={username}
-              onChange={e => setUsername(e.target.value)}
+              minLength={2}
+              maxLength={100}
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
             />
           </InputGroup>
         </div>
@@ -98,7 +98,7 @@ export function LguRegistrationForm({
               placeholder="••••••••"
               autoComplete="new-password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={e => setPassword(e.target.value)}
             />

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { AxiosError } from 'axios'
 import { registerLguAdminUsersLguRegisterPost } from '@networking/api/generated/users/users'
-import { router } from '@/router'
 
 function getErrorMessage(err: unknown): string {
   const axiosErr = err as AxiosError<{ detail?: string }>
@@ -15,12 +14,11 @@ interface UseLguRegistrationOptions {
 }
 
 export function useLguRegistration({ token, email }: UseLguRegistrationOptions) {
-  const [username, setUsername] = useState('')
+  const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -30,32 +28,32 @@ export function useLguRegistration({ token, email }: UseLguRegistrationOptions) 
       setError('Passwords do not match.')
       return
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
       return
     }
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters.')
+    if (fullName.trim().length < 2) {
+      setError('Full name must be at least 2 characters.')
       return
     }
 
     setLoading(true)
     try {
-      await registerLguAdminUsersLguRegisterPost({ token, email, username, password })
-      setSuccess(true)
-      await router.navigate({ to: '/login' })
+      await registerLguAdminUsersLguRegisterPost({ token, email, full_name: fullName.trim(), password })
+      // Backend sets JWT cookie on registration — force full reload so AuthProvider
+      // boots fresh, reads the cookie, and transitions to AUTHENTICATED.
+      window.location.replace('/city-setup')
     } catch (err) {
       setError(getErrorMessage(err))
-    } finally {
       setLoading(false)
     }
   }
 
   return {
-    username, setUsername,
+    fullName, setFullName,
     password, setPassword,
     confirmPassword, setConfirmPassword,
-    error, loading, success,
+    error, loading,
     handleSubmit,
   }
 }

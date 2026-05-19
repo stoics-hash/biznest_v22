@@ -72,6 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(authReducer, { state: 'BOOT' } as AuthState)
 
   const isRefreshingRef    = useRef(false)
+  const isRestoringRef     = useRef(true)   // true during initial session restore
   const refreshQueueRef    = useRef<QueueItem[]>([])
   const refreshTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scheduleRefreshRef = useRef<((token: string) => void) | null>(null)
@@ -152,7 +153,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
           tokenManager.clear()
           sessionStorage.removeItem(CITY_ID_KEY)
           dispatch({ type: 'UNAUTHENTICATED' })
-          void router.navigate({ to: '/login' })
+          // Don't redirect during initial restore — the user may be on a public
+          // page (e.g. /lgu/register) that is valid without authentication.
+          if (!isRestoringRef.current) {
+            void router.navigate({ to: '/login' })
+          }
           return Promise.reject(refreshError)
         } finally {
           isRefreshingRef.current = false
@@ -172,6 +177,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // ── Auth actions ──────────────────────────────────────────────────────────
 
   async function restoreSession() {
+    isRestoringRef.current = true
     dispatch({ type: 'RESTORE_START' })
     try {
       const userRes = await axios.get<UserResponse>('/auth/me')
@@ -204,6 +210,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       tokenManager.clear()
       sessionStorage.removeItem(CITY_ID_KEY)
       dispatch({ type: 'UNAUTHENTICATED' })
+    } finally {
+      isRestoringRef.current = false
     }
   }
 

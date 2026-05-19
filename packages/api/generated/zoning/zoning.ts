@@ -248,11 +248,12 @@ export const useProcessZoningImageCitiesCityIdZoningProcessImagePost = <TError =
     }
     /**
  * Return a fresh presigned URL (5 h TTL) for the city's zoning PMTile.
+Returns null if no PMTile has been generated for this city yet.
  * @summary Get Zoning Pmtiles
  */
 export const getZoningPmtilesCitiesCityIdZoningPmtilesGet = (
     cityId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<ZoningPmtilesResponse>> => {
+ ): Promise<AxiosResponse<ZoningPmtilesResponse | null>> => {
 
 
     return axios.default.get(
