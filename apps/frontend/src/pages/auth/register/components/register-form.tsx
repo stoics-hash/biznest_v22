@@ -36,20 +36,22 @@ export function RegisterForm({
         <h1 className="text-2xl font-semibold tracking-tight">
           Create an account
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           Fill in your details to get started.
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <form onSubmit={onSubmit} className="flex flex-col gap-5">
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">Email</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email" className="text-base">
+            Email
+          </Label>
           <Input
             id="email"
             type="email"
@@ -58,11 +60,14 @@ export function RegisterForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="h-11 text-base"
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="full-name">Full name</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="full-name" className="text-base">
+            Full name
+          </Label>
           <Input
             id="full-name"
             type="text"
@@ -73,6 +78,7 @@ export function RegisterForm({
             maxLength={100}
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            className="h-11 text-base"
           />
         </div>
 
@@ -85,9 +91,15 @@ export function RegisterForm({
           minLength={6}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          labelClassName="text-base"
+          inputClassName="h-11 text-base"
         />
 
-        <Button type="submit" className="mt-2 w-full" disabled={loading}>
+        <Button
+          type="submit"
+          className="mt-4 w-full h-11 text-base"
+          disabled={loading}
+        >
           {loading && <Spinner className="mr-2 size-4" />}
           Create account
         </Button>
@@ -101,6 +113,18 @@ export function RegisterForm({
         >
           Sign in
         </Link>
+      </p>
+
+      <p className="mt-6 text-center text-xs text-muted-foreground leading-relaxed">
+        By continuing, you agree to Biznest&apos;s{" "}
+        <a href="#" className="underline hover:no-underline">
+          Terms of Service
+        </a>{" "}
+        and{" "}
+        <a href="#" className="underline hover:no-underline">
+          Privacy Policy
+        </a>
+        , and to receive periodic emails with updates.
       </p>
     </div>
   );
