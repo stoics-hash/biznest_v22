@@ -776,6 +776,9 @@ async def _async_run(
             prefix_dir.mkdir(parents=True, exist_ok=True)
 
             sorted_zips = sorted(zips)
+            if province_filter:
+                sorted_zips = [z for z in sorted_zips if province_filter.lower() in Path(z).stem.lower()]
+                print(f"  filtered to {len(sorted_zips)} ZIP(s) matching '{province_filter}'", flush=True)
             total = len(sorted_zips)
 
             async def _dl(hf_path: str) -> tuple[str, Optional[Path]]:
