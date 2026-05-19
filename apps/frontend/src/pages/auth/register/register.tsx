@@ -1,19 +1,20 @@
-import { Link } from '@tanstack/react-router'
-import { BrandIcon } from '@/config/navigation'
-import { useRegisterForm } from './composables/use-register-form'
-import { AuthImagePanel } from './components/auth-image-panel'
-import { RegisterForm } from './components/register-form'
+import { Link } from "@tanstack/react-router";
+import { BrandIcon } from "@/config/navigation";
+import { useRegisterForm } from "./composables/use-register-form";
+import { RegisterForm } from "./components/register-form";
+import { AuthImagePanel } from "./components/auth-image-panel";
+import { getRandomQuote } from "@/config/quotes";
 
 export function RegisterPage() {
-  const form = useRegisterForm()
+  const form = useRegisterForm();
+
+  const quote = getRandomQuote();
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <AuthImagePanel quote='"Join investors and LGU administrators on BizNest — the Philippines geo-intelligence platform."' />
-
       <div className="flex flex-col items-center justify-center px-6 py-12 sm:px-12">
         <Link
-          to={'/' as never}
+          to={"/" as never}
           className="mb-8 flex items-center gap-2 text-sm font-semibold lg:hidden"
         >
           <BrandIcon className="size-4" />
@@ -32,6 +33,8 @@ export function RegisterPage() {
           onSubmit={form.handleSubmit}
         />
       </div>
+
+      <AuthImagePanel quote={quote} />
     </div>
-  )
+  );
 }

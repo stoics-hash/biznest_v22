@@ -1,19 +1,20 @@
-import { Link } from '@tanstack/react-router'
-import { BrandIcon } from '@/config/navigation'
-import { useLoginForm } from './composables/use-login-form'
-import { AuthImagePanel } from './components/auth-image-panel'
-import { LoginForm } from './components/login-form'
+import { Link } from "@tanstack/react-router";
+import { BrandIcon } from "@/config/navigation";
+import { useLoginForm } from "./composables/use-login-form";
+import { AuthImagePanel } from "./components/auth-image-panel";
+import { LoginForm } from "./components/login-form";
+import { getRandomQuote } from "@/config/quotes";
 
 export function LoginPage() {
-  const form = useLoginForm()
+  const form = useLoginForm();
+
+  const quote = getRandomQuote();
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <AuthImagePanel quote='"Explore city data, investment zones, and geo-intelligence — all in one place."' />
-
       <div className="flex flex-col items-center justify-center px-6 py-12 sm:px-12">
         <Link
-          to={'/' as never}
+          to={"/" as never}
           className="mb-8 flex items-center gap-2 text-sm font-semibold lg:hidden"
         >
           <BrandIcon className="size-4" />
@@ -30,6 +31,8 @@ export function LoginPage() {
           onSubmit={form.handleSubmit}
         />
       </div>
+
+      <AuthImagePanel quote={quote} />
     </div>
-  )
+  );
 }
