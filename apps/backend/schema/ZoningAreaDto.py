@@ -62,6 +62,51 @@ class ZoningAreaUpdate(BaseModel):
     ]
 
 
+class ZoningAreaSummary(BaseModel):
+    """List/get response — geometry excluded (use pmtile_url for rendering)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    city_id: UUID
+    zone_type: ZoneType | None = None
+    color_hex: str | None = None
+    severity: int | None = None
+    pmtile_url: str | None = None
+    created_by: UUID
+    created_at: datetime
+
+    @field_validator("zone_type", mode="before")
+    @classmethod
+    def normalize_zone_type_summary(cls, v: Any) -> ZoneType | None:
+        if v is None:
+            return None
+        try:
+            return ZoneType(str(v).strip().lower())
+        except ValueError:
+            return None
+
+
+class ZoningAreaGeometryResponse(BaseModel):
+    """Geometry-only response — id, city_id, geometry. Enables separate caching from metadata."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    city_id: UUID
+    geometry: dict[str, Any] | None = None
+
+    @field_validator("geometry", mode="before")
+    @classmethod
+    def parse_geometry_geo(cls, v: Any) -> dict[str, Any] | None:
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        try:
+            return dict(mapping(to_shape(v)))
+        except Exception:
+            return None
+
+
 class ZoningAreaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

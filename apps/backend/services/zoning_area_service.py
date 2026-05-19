@@ -25,6 +25,14 @@ def get_by_city(city_id: UUID, db: Session) -> list[ZoningArea]:
     return db.query(ZoningArea).filter(ZoningArea.city_id == city_id).all()
 
 
+def get_geometry_by_city(city_id: UUID, db: Session) -> list[ZoningArea]:
+    return (
+        db.query(ZoningArea)
+        .filter(ZoningArea.city_id == city_id, ZoningArea.geometry.isnot(None))
+        .all()
+    )
+
+
 def get_or_404(zone_id: UUID, city_id: UUID, db: Session) -> ZoningArea:
     zone = db.query(ZoningArea).filter(ZoningArea.id == zone_id, ZoningArea.city_id == city_id).first()
     if not zone:

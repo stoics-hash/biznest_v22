@@ -2,7 +2,9 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from geoalchemy2.shape import to_shape
+from pydantic import BaseModel, ConfigDict, field_validator
+from shapely.geometry import mapping
 
 
 class HazardAreaCreate(BaseModel):
@@ -33,6 +35,7 @@ class HazardAreaSummary(BaseModel):
 
 
 class HazardAreaResponse(BaseModel):
+    """Hazard area with geometry — for the /geometry endpoint."""
     model_config = ConfigDict(from_attributes=True)
 
     id:          UUID
@@ -44,6 +47,18 @@ class HazardAreaResponse(BaseModel):
     geometry:    dict[str, Any] | None
     created_by:  UUID | None
     created_at:  datetime
+
+    @field_validator("geometry", mode="before")
+    @classmethod
+    def parse_geometry(cls, v: Any) -> dict[str, Any] | None:
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        try:
+            return dict(mapping(to_shape(v)))
+        except Exception:
+            return None
 
 
 class HazardPmtileResponse(BaseModel):

@@ -29,7 +29,9 @@ import type {
   GetZoningGeojsonCitiesCityIdZoningGeojsonGetParams,
   HTTPValidationError,
   ZoningAreaCreate,
+  ZoningAreaGeometryResponse,
   ZoningAreaResponse,
+  ZoningAreaSummary,
   ZoningAreaUpdate,
   ZoningImageProcessRequest,
   ZoningPmtilesResponse,
@@ -49,7 +51,7 @@ type AwaitedInput<T> = PromiseLike<T> | T;
  */
 export const listZoningAreasCitiesCityIdZoningGet = (
     cityId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<ZoningAreaResponse[]>> => {
+ ): Promise<AxiosResponse<ZoningAreaSummary[]>> => {
 
 
     return axios.default.get(
@@ -454,7 +456,7 @@ export function useGetZoningGeojsonCitiesCityIdZoningGeojsonGet<TData = Awaited<
 export const getZoningAreaCitiesCityIdZoningZoneIdGet = (
     cityId: string,
     zoneId: string, options?: AxiosRequestConfig
- ): Promise<AxiosResponse<ZoningAreaResponse>> => {
+ ): Promise<AxiosResponse<ZoningAreaSummary>> => {
 
 
     return axios.default.get(
@@ -642,3 +644,35 @@ export const useDeleteZoningAreaCitiesCityIdZoningZoneIdDelete = <TError = Axios
       > => {
       return useMutation(getDeleteZoningAreaCitiesCityIdZoningZoneIdDeleteMutationOptions(options));
     }
+
+
+/**
+ * @summary Get Zoning Geometry by City (id + city_id + geometry only)
+ */
+export const getZoningGeometryCitiesCityIdZoningGeometryGet = (
+    cityId: string, options?: AxiosRequestConfig
+): Promise<AxiosResponse<ZoningAreaGeometryResponse[]>> => {
+    return axios.default.get(`/cities/${cityId}/zoning/geometry`, options);
+  }
+
+export const getGetZoningGeometryCitiesCityIdZoningGeometryGetQueryKey = (cityId: string) => {
+    return [`/cities/${cityId}/zoning/geometry`] as const;
+  }
+
+export const getGetZoningGeometryCitiesCityIdZoningGeometryGetQueryOptions = <TData = Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>, TError = AxiosError<HTTPValidationError>>(cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>, TError, TData>, axios?: AxiosRequestConfig}) => {
+    const {query: queryOptions, axios: axiosOptions} = options ?? {};
+    const queryKey = queryOptions?.queryKey ?? getGetZoningGeometryCitiesCityIdZoningGeometryGetQueryKey(cityId);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>> = ({ signal }) => getZoningGeometryCitiesCityIdZoningGeometryGet(cityId, { signal, ...axiosOptions });
+    return { queryKey, queryFn, enabled: !!(cityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>, TError, TData> & { queryKey: QueryKey }
+  }
+
+export type GetZoningGeometryCitiesCityIdZoningGeometryGetQueryResult = NonNullable<Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>>
+export type GetZoningGeometryCitiesCityIdZoningGeometryGetQueryError = AxiosError<HTTPValidationError>
+
+export function useGetZoningGeometryCitiesCityIdZoningGeometryGet<TData = Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>, TError = AxiosError<HTTPValidationError>>(
+  cityId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getZoningGeometryCitiesCityIdZoningGeometryGet>>, TError, TData>, axios?: AxiosRequestConfig}
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetZoningGeometryCitiesCityIdZoningGeometryGetQueryOptions(cityId, options)
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
