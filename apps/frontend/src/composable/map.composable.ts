@@ -8,10 +8,12 @@ import type { Polygon, MultiPolygon, Feature } from 'geojson'
 import type { IControl } from 'maplibre-gl'
 import type { MapEngine } from '@/engine/map.engine'
 import axios from 'axios'
+import { useQuery } from '@tanstack/react-query'
 import {
-  useGetZoningPmtilesCitiesCityIdZoningPmtilesGet,
-  useListZoningAreasCitiesCityIdZoningGet,
+  getZoningPmtilesCitiesCityIdZoningPmtilesGet,
+  listZoningAreasCitiesCityIdZoningGet,
 } from '@networking/api/generated/zoning/zoning'
+import type { ZoningAreaResponse } from '@networking/api/model/zoningAreaResponse'
 import { useCityContext } from '@/context/city.context'
 
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css'
@@ -297,17 +299,24 @@ export function useDrawPolygon(
 
 export function useZoningPanel() {
   const { selectedCity } = useCityContext()
+  const cityId = selectedCity?.id ?? ''
 
-  // Hooks internally default to enabled: !!(cityId), so no extra options needed.
-  const { data: pmtilesRes, isLoading: pmtilesLoading } = useGetZoningPmtilesCitiesCityIdZoningPmtilesGet(
-    selectedCity?.id ?? '',
-  )
+  // retry: false — 404 is expected when the city has no zoning data yet
+  const { data: pmtilesRes, isLoading: pmtilesLoading } = useQuery({
+    queryKey: [`/cities/${cityId}/zoning/pmtiles`],
+    queryFn:  () => getZoningPmtilesCitiesCityIdZoningPmtilesGet(cityId),
+    enabled:  !!cityId,
+    retry:    false,
+  })
   const pmtileUrl = pmtilesRes?.data?.pmtile_url ?? null
 
-  const { data, isLoading: zonesLoading } = useListZoningAreasCitiesCityIdZoningGet(
-    selectedCity?.id ?? '',
-  )
-  const zones = data?.data ?? []
+  const { data: zonesRes, isLoading: zonesLoading } = useQuery({
+    queryKey: [`/cities/${cityId}/zoning`],
+    queryFn:  () => listZoningAreasCitiesCityIdZoningGet(cityId),
+    enabled:  !!cityId,
+    retry:    false,
+  })
+  const zones: ZoningAreaResponse[] = zonesRes?.data ?? []
   const isLoading = pmtilesLoading || zonesLoading
 
   const grouped = zones.reduce<Record<string, number>>((acc, z) => {
