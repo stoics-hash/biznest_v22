@@ -7,26 +7,39 @@ import { Input } from "@/components/ui/input";
 
 interface PasswordInputProps extends ComponentProps<typeof Input> {
   label: string;
+  labelClassName?: string;
+  inputClassName?: string;
 }
 
 export function PasswordInput({
   label,
   id,
   className,
+  labelClassName,
+  inputClassName,
   ...props
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium leading-none">
+    <div className="flex flex-col gap-2">
+      <label
+        htmlFor={id}
+        className={labelClassName || "text-sm font-medium leading-none"}
+      >
         {label}
       </label>
       <div className="relative">
         <Input
           id={id}
           type={visible ? "text" : "password"}
-          className={className ? `${className} pr-10` : "pr-10"}
+          className={
+            inputClassName
+              ? `${inputClassName} pr-10`
+              : className
+                ? `${className} pr-10`
+                : "pr-10"
+          }
           {...props}
         />
         <Button
