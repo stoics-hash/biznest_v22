@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useZoningPanel } from '../composables/use-zoning-panel'
+import { useZoningPanel } from '@/composable/map.composable'
 
 export function ZoningPanel() {
-  const { visibleZoningTypes, toggleZoningType, showZoning, setShowZoning } = useMapContext()
+  const { visibleZoningTypes, toggleZoningType, showZoning } = useMapContext()
   const { pmtileUrl, zones, zoneTypes, isLoading } = useZoningPanel()
   const navigate = useNavigate()
 
@@ -65,10 +65,7 @@ export function ZoningPanel() {
                   <span className="text-[10px] tabular-nums text-muted-foreground shrink-0 mr-1">{count}</span>
                   <Switch
                     checked={isVisible}
-                    onCheckedChange={() => {
-                      if (!showZoning) { setShowZoning(true); return }
-                      toggleZoningType(filterKey, allFilterKeys)
-                    }}
+                    onCheckedChange={() => toggleZoningType(filterKey, allFilterKeys)}
                     className="shrink-0 scale-75"
                   />
                 </div>

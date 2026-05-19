@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useMapContext } from '@/context/map.context'
 import { useCityContext } from '@/context/city.context'
-import { useDrawPolygon, type DrawMode } from '../composables/use-draw-polygon'
+import { useDrawPolygon, type DrawMode } from '@/composable/map.composable'
 
 const API_URL = import.meta.env.VITE_API_URL as string
 
